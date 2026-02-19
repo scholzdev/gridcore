@@ -33,26 +33,38 @@ export enum ModuleType {
   DAMAGE_AMP = 3,    // +40% damage
   EFFICIENCY = 4,    // -50% consumes
   OVERCHARGE = 5,    // +60% income
+  CHAIN = 6,         // hit chains to 2 extra targets (30% dmg)
+  PIERCING = 7,      // ignores 50% shield
+  REGEN = 8,         // building self-heals 2% HP/s
+  SLOW_HIT = 9,      // targets slowed 30% for 3s
+  DOUBLE_YIELD = 10, // 20% chance double output
 }
 
 export interface ModuleDef {
   name: string;
   description: string;
   color: string;
-  cost: { steel?: number; electronics?: number; data?: number; };
+  cost: { scrap?: number; steel?: number; electronics?: number; data?: number; };
   appliesTo: TileType[]; // welche Gebäude
+  requiresUnlock?: TileType; // welches Gebäude muss freigeschaltet sein
 }
 
 const TURRETS = [TileType.TURRET, TileType.HEAVY_TURRET, TileType.TESLA_COIL, TileType.PLASMA_CANNON, TileType.LASER_TURRET, TileType.DRONE_HANGAR];
 const PRODUCERS = [TileType.SOLAR_PANEL, TileType.MINER, TileType.FOUNDRY, TileType.FABRICATOR, TileType.LAB, TileType.RECYCLER, TileType.CRYSTAL_DRILL, TileType.STEEL_SMELTER];
+const WALLS_AND_CORE = [TileType.WALL, TileType.CORE];
 export const ORE_BUILDINGS = [TileType.MINER, TileType.CRYSTAL_DRILL, TileType.STEEL_SMELTER];
 
 export const MODULE_DEFS: Record<number, ModuleDef> = {
-  [ModuleType.ATTACK_SPEED]: { name: 'Schnellfeuer', description: '+30% Feuerrate', color: '#e74c3c', cost: { steel: 60, electronics: 40 }, appliesTo: TURRETS },
-  [ModuleType.RANGE_BOOST]: { name: 'Langstrecke', description: '+3 Reichweite', color: '#3498db', cost: { steel: 50, electronics: 30 }, appliesTo: [...TURRETS, TileType.REPAIR_BAY, TileType.SLOW_FIELD, TileType.SHIELD_GENERATOR, TileType.RADAR_STATION] },
-  [ModuleType.DAMAGE_AMP]: { name: 'Schadensverstärker', description: '+40% Schaden', color: '#e67e22', cost: { steel: 80, electronics: 60 }, appliesTo: TURRETS },
-  [ModuleType.EFFICIENCY]: { name: 'Effizienz', description: '-50% Verbrauch', color: '#2ecc71', cost: { electronics: 50, data: 30 }, appliesTo: [...PRODUCERS, TileType.SHIELD_GENERATOR, TileType.DATA_VAULT] },
-  [ModuleType.OVERCHARGE]: { name: 'Überladung', description: '+60% Einkommen', color: '#f39c12', cost: { electronics: 80, data: 50 }, appliesTo: PRODUCERS },
+  [ModuleType.ATTACK_SPEED]: { name: 'Schnellfeuer', description: '+30% Feuerrate', color: '#e74c3c', cost: { steel: 60, electronics: 40 }, appliesTo: TURRETS, requiresUnlock: TileType.HEAVY_TURRET },
+  [ModuleType.RANGE_BOOST]: { name: 'Langstrecke', description: '+3 Reichweite', color: '#3498db', cost: { steel: 50, electronics: 30 }, appliesTo: [...TURRETS, TileType.REPAIR_BAY, TileType.SLOW_FIELD, TileType.SHIELD_GENERATOR, TileType.RADAR_STATION], requiresUnlock: TileType.RADAR_STATION },
+  [ModuleType.DAMAGE_AMP]: { name: 'Schadensverstärker', description: '+40% Schaden', color: '#e67e22', cost: { steel: 80, electronics: 60 }, appliesTo: TURRETS, requiresUnlock: TileType.HEAVY_TURRET },
+  [ModuleType.EFFICIENCY]: { name: 'Effizienz', description: '-50% Verbrauch', color: '#2ecc71', cost: { electronics: 50, data: 30 }, appliesTo: [...PRODUCERS, TileType.SHIELD_GENERATOR, TileType.DATA_VAULT], requiresUnlock: TileType.FABRICATOR },
+  [ModuleType.OVERCHARGE]: { name: 'Überladung', description: '+60% Einkommen', color: '#f39c12', cost: { electronics: 80, data: 50 }, appliesTo: PRODUCERS, requiresUnlock: TileType.RECYCLER },
+  [ModuleType.CHAIN]: { name: 'Kettenblitz', description: 'Trifft 2 Extra-Ziele (30% Dmg)', color: '#a29bfe', cost: { steel: 100, electronics: 80 }, appliesTo: TURRETS, requiresUnlock: TileType.TESLA_COIL },
+  [ModuleType.PIERCING]: { name: 'Panzerbrechend', description: 'Ignoriert 50% Schild', color: '#636e72', cost: { steel: 70, electronics: 50 }, appliesTo: TURRETS, requiresUnlock: TileType.LASER_TURRET },
+  [ModuleType.REGEN]: { name: 'Regeneration', description: 'Selbstheilung 2% HP/s', color: '#00b894', cost: { steel: 40, electronics: 30 }, appliesTo: [...WALLS_AND_CORE, ...PRODUCERS, TileType.REPAIR_BAY, TileType.SHIELD_GENERATOR], requiresUnlock: TileType.REPAIR_BAY },
+  [ModuleType.SLOW_HIT]: { name: 'Verlangsamung', description: 'Getroffene -30% Speed (3s)', color: '#81ecec', cost: { electronics: 60, data: 40 }, appliesTo: TURRETS, requiresUnlock: TileType.SLOW_FIELD },
+  [ModuleType.DOUBLE_YIELD]: { name: 'Doppelertrag', description: '20% Chance doppelter Output', color: '#ffeaa7', cost: { electronics: 100, data: 60 }, appliesTo: PRODUCERS, requiresUnlock: TileType.LAB },
 };
 
 export interface Building {

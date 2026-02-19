@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GameEngine } from './game/Engine';
-import type { Difficulty, GameMode } from './game/types';
+import type { Difficulty, GameMode, TileStats } from './game/types';
 import { STARTER_BUILDINGS } from './game/TechTree';
 import type { TechNode } from './game/TechTree';
 import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS } from './game/Grid';
+import { loadPrestige, savePrestige, resetPrestige, getUpgradeCost, getAvailablePoints, PRESTIGE_UPGRADES } from './game/Prestige';
+import type { PrestigeData, PrestigeBonuses } from './game/Prestige';
 import { StartScreen } from './components/StartScreen';
 import { TopBar } from './components/TopBar';
 import { BuildSidebar } from './components/BuildSidebar';
 import { ModuleSidebar } from './components/ModuleSidebar';
 import { TechTreeOverlay } from './components/TechTreeOverlay';
 import { Tooltip } from './components/Tooltip';
+import { PrestigeOverlay } from './components/PrestigeOverlay';
+import { StatsOverlay } from './components/StatsOverlay';
 
 import { BUILDING_NAMES } from './components/constants';
 
@@ -44,6 +48,12 @@ function App() {
     return new Set(STARTER_BUILDINGS);
   });
   const [waveInfo, setWaveInfo] = useState({ wave: 0, buildPhase: true, buildTimer: 20, enemiesLeft: 0, enemiesTotal: 0 });
+  const [showPrestige, setShowPrestige] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [prestigeData, setPrestigeData] = useState<PrestigeData>(() => loadPrestige());
+  const [tileStats, setTileStats] = useState<Map<string, TileStats>>(new Map());
+  const [globalStats, setGlobalStats] = useState({ totalDamage: 0 });
+  const [hasSave, setHasSave] = useState(() => localStorage.getItem('rectangular_save') !== null);
 
   // ── Game Loop ──────────────────────────────────────────────
 
@@ -69,6 +79,9 @@ function App() {
       setIsGameOver(engineRef.current.gameOver);
       setKillPoints(engineRef.current.killPoints);
       setUnlockedBuildings(new Set(engineRef.current.unlockedBuildings));
+      setPrestigeData({ ...engineRef.current.prestige });
+      setTileStats(new Map(engineRef.current.tileStats));
+      setGlobalStats({ ...engineRef.current.globalStats });
       if (engineRef.current.gameMode === 'wellen') {
         setWaveInfo({
           wave: engineRef.current.currentWave,
@@ -83,6 +96,11 @@ function App() {
     requestAnimationFrame(loop);
   }, [gameStarted]);
 
+  // Sync selected building to engine for range display
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.selectedPlacement = selectedBuilding;
+  }, [selectedBuilding]);
+
   // ── Keyboard ───────────────────────────────────────────────
 
   useEffect(() => {
@@ -90,6 +108,7 @@ function App() {
       if (e.key === 'p' || e.key === 'P') togglePause();
       if (e.key === 'r' || e.key === 'R') { if (engineRef.current?.gameOver) handleRestart(); }
       if (e.key === 't' || e.key === 'T') setShowTechTree(prev => !prev);
+      if (e.key === 's' || e.key === 'S') setShowStats(prev => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -148,6 +167,47 @@ function App() {
     }
   };
 
+  const handlePrestigeBuy = (key: string) => {
+    if (!engineRef.current) return;
+    const bonusKey = key as keyof PrestigeBonuses;
+    const data = engineRef.current.prestige;
+    const available = getAvailablePoints(data);
+    const upg = PRESTIGE_UPGRADES.find(u => u.key === bonusKey);
+    if (!upg) return;
+    const cost = getUpgradeCost(data.bonuses[bonusKey], upg.costBase);
+    if (available < cost || data.bonuses[bonusKey] >= upg.maxLevel) return;
+    data.bonuses[bonusKey]++;
+    savePrestige(data);
+    setPrestigeData({ ...data });
+  };
+
+  const handlePrestigeReset = () => {
+    resetPrestige();
+    if (engineRef.current) {
+      engineRef.current.prestige = loadPrestige();
+    }
+    setPrestigeData(loadPrestige());
+  };
+
+  const handleSave = () => {
+    if (engineRef.current) {
+      engineRef.current.saveGame();
+      setHasSave(true);
+    }
+  };
+
+  const handleLoad = () => {
+    if (!engineRef.current) return;
+    if (engineRef.current.loadGame()) {
+      setResources({ ...engineRef.current.resources.state });
+      setGameStats({ time: engineRef.current.gameTime, killed: engineRef.current.enemiesKilled });
+      setNetIncome({ ...engineRef.current.netIncome });
+      setIsGameOver(false);
+      setPaused(false);
+      setKillPoints(engineRef.current.killPoints);
+    }
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!engineRef.current || !isEngineReady) return;
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -156,6 +216,10 @@ function App() {
     const worldY = Math.floor((e.clientY - rect.top) / zoom);
 
     if (worldX >= 0 && worldX < 30 && worldY >= 0 && worldY < 30) {
+      // Set hover for range display
+      engineRef.current.hoverGridX = worldX;
+      engineRef.current.hoverGridY = worldY;
+
       const type = engineRef.current.grid.tiles[worldY][worldX];
       if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
         const level = engineRef.current.grid.levels[worldY][worldX] || 1;
@@ -186,6 +250,7 @@ function App() {
       }
     }
     setHoverPos(h => ({ ...h, show: false }));
+    if (engineRef.current) { engineRef.current.hoverGridX = -1; engineRef.current.hoverGridY = -1; }
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -302,6 +367,24 @@ function App() {
           onReset={handleResetUnlocks}
         />
       )}
+      {showPrestige && (
+        <PrestigeOverlay
+          prestige={prestigeData}
+          onBuy={handlePrestigeBuy}
+          onClose={() => setShowPrestige(false)}
+          onReset={handlePrestigeReset}
+        />
+      )}
+      {showStats && engineRef.current && (
+        <StatsOverlay
+          tileStats={tileStats}
+          globalStats={globalStats}
+          enemiesKilled={gameStats.killed}
+          gameTime={gameStats.time}
+          grid={{ tiles: engineRef.current.grid.tiles, levels: engineRef.current.grid.levels }}
+          onClose={() => setShowStats(false)}
+        />
+      )}
 
       <TopBar
         paused={paused}
@@ -318,6 +401,11 @@ function App() {
         onTogglePause={togglePause}
         onRestart={handleRestart}
         onToggleTechTree={() => setShowTechTree(prev => !prev)}
+        onTogglePrestige={() => setShowPrestige(prev => !prev)}
+        onToggleStats={() => setShowStats(prev => !prev)}
+        onSave={handleSave}
+        onLoad={handleLoad}
+        hasSave={hasSave}
       />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -335,7 +423,7 @@ function App() {
           <canvas
             ref={canvasRef}
             onMouseMove={handleMouseMove}
-            onMouseLeave={() => setHoverPos(h => ({ ...h, show: false }))}
+            onMouseLeave={() => { setHoverPos(h => ({ ...h, show: false })); if (engineRef.current) { engineRef.current.hoverGridX = -1; engineRef.current.hoverGridY = -1; } }}
             onClick={handleCanvasClick}
             onContextMenu={handleContextMenu}
             style={{ cursor: 'crosshair', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', borderRadius: '8px' }}
@@ -347,6 +435,7 @@ function App() {
           setSelectedModule={setSelectedModule}
           setSelectedBuilding={setSelectedBuilding}
           canAffordModule={canAffordModule}
+          unlockedBuildings={unlockedBuildings}
         />
       </div>
     </div>

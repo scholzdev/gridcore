@@ -24,11 +24,17 @@ interface TopBarProps {
   onTogglePause: () => void;
   onRestart: () => void;
   onToggleTechTree: () => void;
+  onTogglePrestige: () => void;
+  onToggleStats: () => void;
+  onSave: () => void;
+  onLoad: () => void;
+  hasSave: boolean;
 }
 
 export const TopBar = ({
   paused, isGameOver, difficulty, gameMode, gameStats, coreHealth, resources, netIncome,
-  killPoints, showTechTree, waveInfo, onTogglePause, onRestart, onToggleTechTree
+  killPoints, showTechTree, waveInfo, onTogglePause, onRestart, onToggleTechTree,
+  onTogglePrestige, onToggleStats, onSave, onLoad, hasSave
 }: TopBarProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -86,6 +92,26 @@ export const TopBar = ({
         padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
         backgroundColor: showTechTree ? '#8e44ad' : '#9b59b6', color: '#fff', border: 'none'
       }}>🔬 TECHBAUM ({killPoints} KP)</button>
+
+      <button onClick={onTogglePrestige} style={{
+        padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#f39c12', color: '#fff', border: 'none'
+      }}>⭐ PRESTIGE</button>
+
+      <button onClick={onToggleStats} style={{
+        padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#2980b9', color: '#fff', border: 'none'
+      }}>📊 STATS</button>
+
+      <button onClick={onSave} style={{
+        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#27ae60', color: '#fff', border: 'none'
+      }}>💾</button>
+
+      {hasSave && <button onClick={onLoad} style={{
+        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#3498db', color: '#fff', border: 'none'
+      }}>📂</button>}
 
       <div style={{ fontSize: '14px' }}>KERN: <span style={{ color: coreHealth.current < coreHealth.max * 0.3 ? '#e74c3c' : '#2d3436', fontWeight: 'bold' }}>{Math.max(0, Math.floor(coreHealth.current))}</span></div>
       <div style={{ width: '1px', height: '20px', backgroundColor: '#dfe4ea' }} />

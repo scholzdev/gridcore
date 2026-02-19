@@ -27,6 +27,7 @@ export interface Enemy {
   maxHealth: number;
   speed: number;
   lastHit: number;
+  slowedUntil?: number; // timestamp until which enemy is slowed
 }
 
 export interface Projectile {
@@ -40,6 +41,22 @@ export interface Projectile {
   damage: number;
   targetId: string;
   splash?: number;
+  sourceX?: number;
+  sourceY?: number;
+  modType?: number; // module on the turret that fired this
+}
+
+export interface DamageNumber {
+  x: number;
+  y: number;
+  amount: number;
+  life: number;
+  color: string;
+}
+
+export interface TileStats {
+  totalDamage: number;
+  kills: number;
 }
 
 export interface Particle {

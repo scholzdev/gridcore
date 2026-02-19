@@ -3,7 +3,9 @@ import { ResourceManager } from './Resources';
 import { Renderer } from './Renderer';
 import { detonateMines, moveEnemies, turretLogic, updateProjectiles, updateParticles, updateDrones } from './Combat';
 import { loadUnlocks, saveUnlocks, resetUnlocks as resetUnlocksStorage, STARTER_BUILDINGS } from './TechTree';
-import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus } from './types';
+import { loadPrestige, savePrestige, calcPrestigeEarned } from './Prestige';
+import type { PrestigeData } from './Prestige';
+import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
 import { DIFFICULTY_PRESETS } from './types';
 import type { TechNode } from './TechTree';
 
@@ -18,6 +20,21 @@ export class GameEngine {
   drones: Drone[] = [];
   laserBeams: LaserBeam[] = [];
   laserFocus: Map<string, LaserFocus> = new Map();
+  damageNumbers: DamageNumber[] = [];
+
+  // Hover & placement tracking for range display
+  hoverGridX: number = -1;
+  hoverGridY: number = -1;
+  selectedPlacement: TileType = TileType.SOLAR_PANEL;
+
+  // Stats tracking
+  tileStats: Map<string, TileStats> = new Map();
+  globalStats = { totalDamage: 0 };
+
+  // Prestige
+  prestige: PrestigeData;
+  prestigeEarned: number = 0;
+  prestigeAwarded: boolean = false;
 
   lastTick: number = 0;
   tickRate: number = 1000;
@@ -61,6 +78,8 @@ export class GameEngine {
     this.renderer = new Renderer(canvas);
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
     this.unlockedBuildings = loadUnlocks();
+    this.prestige = loadPrestige();
+    this.applyPrestigeStartBonuses();
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -102,6 +121,7 @@ export class GameEngine {
     this.drones = [];
     this.laserBeams = [];
     this.laserFocus.clear();
+    this.damageNumbers = [];
     this.lastTick = 0;
     this.gameOver = false;
     this.paused = false;
@@ -122,6 +142,12 @@ export class GameEngine {
     this.waveBuildTimer = 20;
     this.waveActive = false;
     this.waveSpawnTimer = 0;
+    this.tileStats.clear();
+    this.globalStats = { totalDamage: 0 };
+    this.prestigeEarned = 0;
+    this.prestigeAwarded = false;
+    this.prestige = loadPrestige();
+    this.applyPrestigeStartBonuses();
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
   }
 
@@ -131,17 +157,154 @@ export class GameEngine {
     this.killPoints = 0;
   }
 
+  // ── Prestige ───────────────────────────────────────────────
+
+  applyPrestigeStartBonuses() {
+    const b = this.prestige.bonuses;
+    this.resources.state.scrap += b.startScrapLvl * 20;
+    this.resources.state.energy += b.startEnergyLvl * 20;
+  }
+
+  get prestigeDamageMult(): number {
+    return 1 + this.prestige.bonuses.damageLvl * 0.1;
+  }
+
+  get prestigeIncomeMult(): number {
+    return 1 + this.prestige.bonuses.incomeLvl * 0.1;
+  }
+
+  get prestigeCostMult(): number {
+    return Math.max(0.5, 1 - this.prestige.bonuses.costReductionLvl * 0.05);
+  }
+
+  // ── Stats ──────────────────────────────────────────────────
+
+  addTileDamage(tileX: number, tileY: number, damage: number) {
+    const key = `${tileX},${tileY}`;
+    const stats = this.tileStats.get(key) || { totalDamage: 0, kills: 0 };
+    stats.totalDamage += damage;
+    this.tileStats.set(key, stats);
+    this.globalStats.totalDamage += damage;
+  }
+
+  addTileKill(tileX: number, tileY: number) {
+    const key = `${tileX},${tileY}`;
+    const stats = this.tileStats.get(key) || { totalDamage: 0, kills: 0 };
+    stats.kills++;
+    this.tileStats.set(key, stats);
+  }
+
+  addDamageNumber(x: number, y: number, amount: number, color: string = '#e74c3c') {
+    this.damageNumbers.push({ x, y, amount: Math.round(amount), life: 30, color });
+  }
+
+  // ── Save / Load ────────────────────────────────────────────
+
+  saveGame() {
+    const state = {
+      grid: { tiles: this.grid.tiles, healths: this.grid.healths, shields: this.grid.shields, modules: this.grid.modules, levels: this.grid.levels },
+      resources: this.resources.state,
+      enemies: this.enemies,
+      gameTime: this.gameTime,
+      killPoints: this.killPoints,
+      enemiesKilled: this.enemiesKilled,
+      buildingsPlaced: this.buildingsPlaced,
+      purchasedCounts: this.purchasedCounts,
+      difficulty: this.difficulty,
+      gameMode: this.gameMode,
+      currentWave: this.currentWave,
+      waveEnemiesTotal: this.waveEnemiesTotal,
+      waveEnemiesSpawned: this.waveEnemiesSpawned,
+      waveEnemiesKilledThisWave: this.waveEnemiesKilledThisWave,
+      waveBuildPhase: this.waveBuildPhase,
+      waveBuildTimer: this.waveBuildTimer,
+      waveActive: this.waveActive,
+      tileStats: Object.fromEntries(this.tileStats),
+      globalStats: this.globalStats,
+    };
+    localStorage.setItem('rectangular_save', JSON.stringify(state));
+  }
+
+  loadGame(): boolean {
+    try {
+      const saved = localStorage.getItem('rectangular_save');
+      if (!saved) return false;
+      const s = JSON.parse(saved);
+
+      // Grid
+      const size = this.grid.size;
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          this.grid.tiles[y][x] = s.grid.tiles[y][x];
+          this.grid.healths[y][x] = s.grid.healths[y][x];
+          this.grid.shields[y][x] = s.grid.shields[y][x];
+          this.grid.modules[y][x] = s.grid.modules[y][x];
+          this.grid.levels[y][x] = s.grid.levels[y][x];
+        }
+      }
+
+      // Resources
+      this.resources.state = { ...s.resources };
+
+      // Enemies
+      this.enemies = s.enemies || [];
+      this.projectiles = [];
+      this.particles = [];
+      this.drones = [];
+      this.laserBeams = [];
+      this.laserFocus.clear();
+      this.damageNumbers = [];
+
+      // State
+      this.gameTime = s.gameTime;
+      this.killPoints = s.killPoints;
+      this.enemiesKilled = s.enemiesKilled;
+      this.buildingsPlaced = s.buildingsPlaced;
+      this.purchasedCounts = s.purchasedCounts;
+      this.difficulty = s.difficulty;
+      this.diffConfig = DIFFICULTY_PRESETS[s.difficulty as Difficulty];
+      this.gameMode = s.gameMode;
+      this.currentWave = s.currentWave;
+      this.waveEnemiesTotal = s.waveEnemiesTotal;
+      this.waveEnemiesSpawned = s.waveEnemiesSpawned;
+      this.waveEnemiesKilledThisWave = s.waveEnemiesKilledThisWave;
+      this.waveBuildPhase = s.waveBuildPhase;
+      this.waveBuildTimer = s.waveBuildTimer;
+      this.waveActive = s.waveActive;
+      this.lastTick = 0;
+      this.gameOver = false;
+      this.paused = false;
+      this.prestigeAwarded = false;
+      this.prestigeEarned = 0;
+
+      // Stats
+      this.tileStats = new Map(Object.entries(s.tileStats || {})) as Map<string, TileStats>;
+      this.globalStats = s.globalStats || { totalDamage: 0 };
+
+      return true;
+    } catch { return false; }
+  }
+
+  hasSave(): boolean {
+    return localStorage.getItem('rectangular_save') !== null;
+  }
+
+  deleteSave() {
+    localStorage.removeItem('rectangular_save');
+  }
+
   getCurrentCost(type: number) {
     const stats = BUILDING_STATS[type];
     if (!stats || !stats.cost) return { scrap: 0 };
     const count = this.purchasedCounts[type] || 0;
     const inc = stats.costIncrease || {};
+    const cm = this.prestigeCostMult;
     return {
-      energy: (stats.cost.energy || 0) + (inc.energy || 0) * count,
-      scrap: (stats.cost.scrap || 0) + (inc.scrap || 0) * count,
-      steel: (stats.cost.steel || 0) + (inc.steel || 0) * count,
-      electronics: (stats.cost.electronics || 0) + (inc.electronics || 0) * count,
-      data: (stats.cost.data || 0) + (inc.data || 0) * count,
+      energy: Math.floor(((stats.cost.energy || 0) + (inc.energy || 0) * count) * cm),
+      scrap: Math.floor(((stats.cost.scrap || 0) + (inc.scrap || 0) * count) * cm),
+      steel: Math.floor(((stats.cost.steel || 0) + (inc.steel || 0) * count) * cm),
+      electronics: Math.floor(((stats.cost.electronics || 0) + (inc.electronics || 0) * count) * cm),
+      data: Math.floor(((stats.cost.data || 0) + (inc.data || 0) * count) * cm),
     };
   }
 
@@ -182,7 +345,16 @@ export class GameEngine {
   // ── Main Loop ──────────────────────────────────────────────
 
   update(timestamp: number) {
-    if (this.gameOver) return this.renderer.drawGameOver(this);
+    if (this.gameOver) {
+      if (!this.prestigeAwarded) {
+        this.prestigeEarned = calcPrestigeEarned(this.enemiesKilled, this.gameTime);
+        this.prestige.totalPoints += this.prestigeEarned;
+        savePrestige(this.prestige);
+        this.prestigeAwarded = true;
+      }
+      this.renderer.drawGameOver(this);
+      return;
+    }
     if (this.paused) { this.renderer.draw(this); return; }
 
     if (this.lastTick === 0) this.lastTick = timestamp;
@@ -221,6 +393,13 @@ export class GameEngine {
     updateProjectiles(this);
     updateParticles(this);
     updateDrones(this);
+
+    // Update damage numbers
+    this.damageNumbers = this.damageNumbers.filter(d => {
+      d.y -= 0.02;
+      d.life--;
+      return d.life > 0;
+    });
 
     // Render
     this.renderer.draw(this);
@@ -265,14 +444,22 @@ export class GameEngine {
 
         // Income
         if (stats.income) {
-          const incomeMult = mod === ModuleType.OVERCHARGE ? mult * 1.6 : mult;
+          const incomeMult = (mod === ModuleType.OVERCHARGE ? mult * 1.6 : mult) * this.prestigeIncomeMult;
+          const doubleRoll = mod === ModuleType.DOUBLE_YIELD && Math.random() < 0.2 ? 2 : 1;
           const income = { ...stats.income };
-          if (income.energy) { income.energy *= incomeMult; tickIncome.energy += income.energy; }
-          if (income.scrap) { income.scrap *= incomeMult; tickIncome.scrap += income.scrap; }
-          if (income.steel) { income.steel *= incomeMult; tickIncome.steel += income.steel; }
-          if (income.electronics) { income.electronics *= incomeMult; tickIncome.electronics += income.electronics; }
-          if (income.data) { income.data *= incomeMult; tickIncome.data += income.data; }
+          if (income.energy) { income.energy *= incomeMult * doubleRoll; tickIncome.energy += income.energy; }
+          if (income.scrap) { income.scrap *= incomeMult * doubleRoll; tickIncome.scrap += income.scrap; }
+          if (income.steel) { income.steel *= incomeMult * doubleRoll; tickIncome.steel += income.steel; }
+          if (income.electronics) { income.electronics *= incomeMult * doubleRoll; tickIncome.electronics += income.electronics; }
+          if (income.data) { income.data *= incomeMult * doubleRoll; tickIncome.data += income.data; }
           this.resources.add(income);
+        }
+
+        // Regeneration module: self-heal 2% max HP per tick
+        if (mod === ModuleType.REGEN) {
+          const maxHP = (stats.maxHealth || 100) * (1 + (level - 1) * 0.5);
+          const healAmt = maxHP * 0.02;
+          this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + healAmt);
         }
 
         // Repair Bay

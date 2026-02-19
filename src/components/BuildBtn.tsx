@@ -43,7 +43,7 @@ export const BuildBtn = ({ type, selected, set, label, cost, color, affordable =
         padding: '12px', backgroundColor: '#f8f9fa',
         border: '1px solid #dfe4ea', color: '#b2bec3',
         textAlign: 'left', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: '10px',
-        borderRadius: '8px', opacity: 0.4, width: '100%'
+        borderRadius: '8px', opacity: 0.6, width: '100%'
       }}>
         <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: '#dfe4ea', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>🔒</div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -70,11 +70,11 @@ export const BuildBtn = ({ type, selected, set, label, cost, color, affordable =
 
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}>
-      <button onClick={() => set(type)} style={{
+      <button onClick={affordable ? () => set(type) : undefined} disabled={!affordable} style={{
         padding: '12px', backgroundColor: selected === type ? '#f1f2f6' : 'transparent',
         border: selected === type ? `2px solid ${color}` : '1px solid #dfe4ea',
-        color: '#2d3436', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', borderRadius: '8px',
-        opacity: affordable ? 1 : 0.35, width: '100%'
+        color: '#2d3436', textAlign: 'left', cursor: affordable ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '10px', borderRadius: '8px',
+        opacity: affordable ? 1 : 0.55, width: '100%'
       }}>
         <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: color, flexShrink: 0 }} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>

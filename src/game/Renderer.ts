@@ -1,5 +1,5 @@
 import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS } from './Grid';
-import type { Enemy, Drone, LaserBeam } from './types';
+import type { Enemy, Drone, LaserBeam, DamageNumber } from './types';
 import type { GameEngine } from './Engine';
 
 // FESTE FARB-PALETTE
@@ -71,14 +71,18 @@ export class Renderer {
           ctx.fillStyle = TILE_COLORS[type] || '#ff00ff';
           this.drawBuildingRect(px, py, zoom, level);
 
-          // HP bar
+          const p = zoom / 8;
+          const s = zoom - p * 2;
+
+          // HP bar — only when damaged
           const hp = grid.healths[y][x];
           const baseMax = BUILDING_STATS[type]?.maxHealth || 100;
           const max = baseMax * (1 + (level - 1) * 0.5);
-          const p = zoom / 8;
-          const s = zoom - p * 2;
-          ctx.fillStyle = '#ecf0f1'; ctx.fillRect(px + p, py + zoom - p - 5, s, 5);
-          ctx.fillStyle = '#2ecc71'; ctx.fillRect(px + p, py + zoom - p - 5, s * (hp / max), 5);
+          if (hp < max) {
+            ctx.fillStyle = '#ecf0f1'; ctx.fillRect(px + p, py + zoom - p - 5, s, 5);
+            ctx.fillStyle = hp / max > 0.5 ? '#2ecc71' : hp / max > 0.25 ? '#f39c12' : '#e74c3c';
+            ctx.fillRect(px + p, py + zoom - p - 5, s * (hp / max), 5);
+          }
 
           // Shield bar
           const shield = grid.shields[y][x];
@@ -129,6 +133,12 @@ export class Renderer {
 
     // Drones
     this.drawDrones(engine.drones, zoom);
+
+    // Range indicator
+    this.drawRangeIndicator(engine, zoom);
+
+    // Damage numbers
+    this.drawDamageNumbers(engine.damageNumbers, zoom);
   }
 
   private drawEnemies(enemies: Enemy[], zoom: number) {
@@ -203,6 +213,59 @@ export class Renderer {
     ctx.fillRect(x, y, w * Math.max(0, val / max), h);
   }
 
+  private drawRangeIndicator(engine: GameEngine, zoom: number) {
+    const { ctx } = this;
+    const hx = engine.hoverGridX;
+    const hy = engine.hoverGridY;
+    if (hx < 0 || hy < 0 || hx >= engine.grid.size || hy >= engine.grid.size) return;
+
+    const existingType = engine.grid.tiles[hy][hx];
+    let range = 0;
+
+    if (existingType !== TileType.EMPTY && existingType !== TileType.ORE_PATCH) {
+      // Hovering over existing building — show its range
+      const stats = BUILDING_STATS[existingType];
+      if (stats?.range) range = stats.range;
+    } else {
+      // Placing a new building — show selected building's range
+      const stats = BUILDING_STATS[engine.selectedPlacement];
+      if (stats?.range) range = stats.range;
+    }
+
+    if (range <= 0) return;
+
+    const cx = (hx + 0.5) * zoom;
+    const cy = (hy + 0.5) * zoom;
+    const r = range * zoom;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(52, 152, 219, 0.08)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  private drawDamageNumbers(numbers: DamageNumber[], zoom: number) {
+    const { ctx } = this;
+    numbers.forEach(d => {
+      const alpha = Math.min(1, d.life / 15);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = d.color;
+      ctx.font = `bold ${Math.max(10, zoom / 3)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 3;
+      ctx.fillText(`${d.amount}`, d.x * zoom, d.y * zoom);
+      ctx.shadowBlur = 0;
+    });
+    ctx.globalAlpha = 1;
+  }
+
   drawGameOver(engine: GameEngine) {
     const { ctx, canvas } = this;
     const w = canvas.width, h = canvas.height;
@@ -230,8 +293,13 @@ export class Renderer {
       ctx.fillText(`Schwierigkeit: ${engine.diffConfig.label}`, w / 2, h * 0.64);
     }
 
+    ctx.fillStyle = '#f39c12';
+    ctx.font = `bold ${w / 18}px monospace`;
+    const py = engine.gameMode === 'wellen' ? h * 0.82 : h * 0.74;
+    ctx.fillText(`+${engine.prestigeEarned} Prestige-Punkte`, w / 2, py);
+
     ctx.fillStyle = '#7f8c8d';
     ctx.font = `${w / 28}px monospace`;
-    ctx.fillText('Drücke R oder klicke Neustart', w / 2, engine.gameMode === 'wellen' ? h * 0.82 : h * 0.72);
+    ctx.fillText('Drücke R oder klicke Neustart', w / 2, py + w / 16);
   }
 }

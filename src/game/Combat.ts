@@ -2,6 +2,22 @@ import { TileType, BUILDING_STATS, ModuleType } from './Grid';
 import type { Enemy } from './types';
 import type { GameEngine } from './Engine';
 
+function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?: number) {
+  engine.enemiesKilled++;
+  engine.killPoints++;
+  engine.resources.add({ scrap: 30 });
+  if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
+  if (sourceX !== undefined && sourceY !== undefined) engine.addTileKill(sourceX, sourceY);
+  // Explosion effect — more particles on death
+  const count = 10 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.3;
+    const speed = 0.04 + Math.random() * 0.06;
+    const colors = ['#e74c3c', '#f39c12', '#fdcb6e', '#d63031', '#ff7675'];
+    engine.particles.push({ x: enemy.x, y: enemy.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 15 + Math.floor(Math.random() * 10), color: colors[Math.floor(Math.random() * colors.length)] });
+  }
+}
+
 export function detonateMines(engine: GameEngine) {
   const toDetonate: { x: number; y: number }[] = [];
   engine.enemies.forEach(e => {
@@ -19,10 +35,14 @@ export function detonateMines(engine: GameEngine) {
   toDetonate.forEach(mine => {
     const level = engine.grid.levels[mine.y][mine.x] || 1;
     const mult = 1 + (level - 1) * 0.5;
-    const mineDmg = (BUILDING_STATS[TileType.MINEFIELD]?.damage || 250) * mult;
+    const mineDmg = (BUILDING_STATS[TileType.MINEFIELD]?.damage || 250) * mult * engine.prestigeDamageMult;
     engine.enemies.forEach(e => {
       const dist = Math.sqrt(Math.pow(e.x - mine.x - 0.5, 2) + Math.pow(e.y - mine.y - 0.5, 2));
-      if (dist <= 2.5) e.health -= mineDmg;
+      if (dist <= 2.5) {
+        e.health -= mineDmg;
+        engine.addDamageNumber(e.x, e.y, mineDmg, '#d63031');
+        engine.addTileDamage(mine.x, mine.y, mineDmg);
+      }
     });
     engine.grid.tiles[mine.y][mine.x] = TileType.EMPTY;
     engine.grid.levels[mine.y][mine.x] = 0;
@@ -30,19 +50,19 @@ export function detonateMines(engine: GameEngine) {
     engine.grid.shields[mine.y][mine.x] = 0;
     engine.grid.modules[mine.y][mine.x] = 0;
     if (engine.purchasedCounts[TileType.MINEFIELD] > 0) engine.purchasedCounts[TileType.MINEFIELD]--;
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 / 12) * i;
-      engine.particles.push({ x: mine.x + 0.5, y: mine.y + 0.5, vx: Math.cos(angle) * 0.08, vy: Math.sin(angle) * 0.08, life: 20, color: '#d63031' });
+    // Big mine explosion
+    for (let i = 0; i < 20; i++) {
+      const angle = (Math.PI * 2 / 20) * i + (Math.random() - 0.5) * 0.2;
+      const speed = 0.05 + Math.random() * 0.08;
+      const colors = ['#d63031', '#e17055', '#fdcb6e', '#ff7675', '#fab1a0'];
+      engine.particles.push({ x: mine.x + 0.5, y: mine.y + 0.5, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 20 + Math.floor(Math.random() * 10), color: colors[Math.floor(Math.random() * colors.length)] });
     }
   });
 
   if (toDetonate.length > 0) {
     engine.enemies = engine.enemies.filter(e => {
       if (e.health <= 0) {
-        engine.enemiesKilled++;
-        engine.killPoints++;
-        engine.resources.add({ scrap: 30 });
-        if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
+        killEnemy(engine, e, toDetonate[0].x, toDetonate[0].y);
         return false;
       }
       return true;
@@ -89,23 +109,23 @@ export function turretLogic(engine: GameEngine) {
       const effectiveRange = (stats.range || 6) + radarBuff[y][x] + (mod === ModuleType.RANGE_BOOST ? 3 : 0);
       const mult = 1 + (level - 1) * 0.5;
       const dmgMult = mod === ModuleType.DAMAGE_AMP ? 1.4 : 1;
-      const dmg = (stats.damage!) * mult * engine.dataVaultBuff * dmgMult;
+      const dmg = (stats.damage!) * mult * engine.dataVaultBuff * dmgMult * engine.prestigeDamageMult;
       const fireChance = mod === ModuleType.ATTACK_SPEED ? 0.87 : 0.9;
 
       if (type === TileType.TESLA_COIL) {
-        fireTesla(engine, x, y, effectiveRange, dmg, fireChance, level);
+        fireTesla(engine, x, y, effectiveRange, dmg, fireChance, level, mod);
       } else if (type === TileType.PLASMA_CANNON) {
-        firePlasma(engine, x, y, effectiveRange, dmg, fireChance);
+        firePlasma(engine, x, y, effectiveRange, dmg, fireChance, mod);
       } else if (type === TileType.LASER_TURRET) {
-        fireLaser(engine, x, y, effectiveRange, dmg, fireChance);
+        fireLaser(engine, x, y, effectiveRange, dmg, fireChance, mod);
       } else {
-        fireNormal(engine, x, y, type, effectiveRange, dmg, fireChance);
+        fireNormal(engine, x, y, type, effectiveRange, dmg, fireChance, mod);
       }
     }
   }
 }
 
-function fireTesla(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number, level: number) {
+function fireTesla(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number, level: number, mod: number) {
   const maxTargets = 3 + level;
   const targets = engine.enemies.filter(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   const selected = targets.slice(0, maxTargets);
@@ -114,24 +134,26 @@ function fireTesla(engine: GameEngine, x: number, y: number, range: number, dmg:
       engine.projectiles.push({
         id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
         targetX: target.x, targetY: target.y, targetId: target.id,
-        speed: 0.6, color: '#6c5ce7', damage: dmg
+        speed: 0.6, color: '#6c5ce7', damage: dmg,
+        sourceX: x, sourceY: y, modType: mod
       });
     });
   }
 }
 
-function firePlasma(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number) {
+function firePlasma(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number, mod: number) {
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target && Math.random() > (fireChance + 0.05)) {
     engine.projectiles.push({
       id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
       targetX: target.x, targetY: target.y, targetId: target.id,
-      speed: 0.3, color: '#fd79a8', damage: dmg, splash: 2
+      speed: 0.3, color: '#fd79a8', damage: dmg, splash: 2,
+      sourceX: x, sourceY: y, modType: mod
     });
   }
 }
 
-function fireLaser(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number) {
+function fireLaser(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number, mod: number) {
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target) {
     const key = `${x},${y}`;
@@ -148,13 +170,22 @@ function fireLaser(engine: GameEngine, x: number, y: number, range: number, dmg:
     });
     if (Math.random() > fireChance) {
       const laserDmg = dmg * focusMult;
-      target.health -= laserDmg;
+      // Piercing: bypass 50% of shield on the target
+      if (mod === ModuleType.PIERCING && target.maxHealth > 0) {
+        // Direct damage, bypasses shields conceptually
+        target.health -= laserDmg;
+      } else {
+        target.health -= laserDmg;
+      }
+      // Slow hit
+      if (mod === ModuleType.SLOW_HIT) {
+        target.slowedUntil = Date.now() + 3000;
+      }
+      engine.addDamageNumber(target.x, target.y, laserDmg, '#e84393');
+      engine.addTileDamage(x, y, laserDmg);
       if (target.health <= 0) {
         engine.enemies = engine.enemies.filter(e => e.id !== target.id);
-        engine.enemiesKilled++;
-        engine.killPoints++;
-        engine.resources.add({ scrap: 30 });
-        if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
+        killEnemy(engine, target, x, y);
         engine.laserFocus.delete(key);
       }
     }
@@ -163,15 +194,51 @@ function fireLaser(engine: GameEngine, x: number, y: number, range: number, dmg:
   }
 }
 
-function fireNormal(engine: GameEngine, x: number, y: number, type: TileType, range: number, dmg: number, fireChance: number) {
+function fireNormal(engine: GameEngine, x: number, y: number, type: TileType, range: number, dmg: number, fireChance: number, mod: number) {
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target && Math.random() > fireChance) {
     engine.projectiles.push({
       id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
       targetX: target.x, targetY: target.y, targetId: target.id,
       speed: 0.4, color: type === TileType.HEAVY_TURRET ? '#c0392b' : '#e67e22',
-      damage: dmg
+      damage: dmg,
+      sourceX: x, sourceY: y, modType: mod
     });
+  }
+}
+
+function applyHitEffects(engine: GameEngine, target: Enemy, p: { damage: number; modType?: number; sourceX?: number; sourceY?: number; color: string }) {
+  // Piercing: 50% of damage bypasses shields (bonus damage)
+  const piercingBonus = p.modType === ModuleType.PIERCING ? p.damage * 0.5 : 0;
+  target.health -= p.damage + piercingBonus;
+  engine.addDamageNumber(target.x, target.y, p.damage + piercingBonus, p.color);
+  if (p.sourceX !== undefined && p.sourceY !== undefined) engine.addTileDamage(p.sourceX, p.sourceY, p.damage + piercingBonus);
+
+  // Slow hit: slow for 3 seconds
+  if (p.modType === ModuleType.SLOW_HIT) {
+    target.slowedUntil = Date.now() + 3000;
+  }
+
+  // Chain: fire at 2 extra nearby targets for 30% damage
+  if (p.modType === ModuleType.CHAIN) {
+    const chainDmg = p.damage * 0.3;
+    let chainCount = 0;
+    for (const e of engine.enemies) {
+      if (e.id === target.id || chainCount >= 2) continue;
+      const dist = Math.sqrt(Math.pow(e.x - target.x, 2) + Math.pow(e.y - target.y, 2));
+      if (dist <= 3) {
+        e.health -= chainDmg;
+        engine.addDamageNumber(e.x, e.y, chainDmg, '#a29bfe');
+        if (p.sourceX !== undefined && p.sourceY !== undefined) engine.addTileDamage(p.sourceX, p.sourceY, chainDmg);
+        // Chain lightning visual
+        engine.laserBeams.push({ fromX: target.x, fromY: target.y, toX: e.x, toY: e.y, color: '#a29bfe', width: 1.5 });
+        if (e.health <= 0) {
+          engine.enemies = engine.enemies.filter(en => en.id !== e.id);
+          killEnemy(engine, e, p.sourceX, p.sourceY);
+        }
+        chainCount++;
+      }
+    }
   }
 }
 
@@ -186,31 +253,27 @@ export function updateProjectiles(engine: GameEngine) {
         engine.enemies.forEach(e => {
           const dist = Math.sqrt(Math.pow(e.x - p.targetX, 2) + Math.pow(e.y - p.targetY, 2));
           if (dist <= p.splash!) {
-            e.health -= p.damage;
+            applyHitEffects(engine, e, p);
             if (e.health <= 0) toRemove.push(e.id);
           }
         });
         toRemove.forEach(id => {
+          const dead = engine.enemies.find(e => e.id === id);
           engine.enemies = engine.enemies.filter(e => e.id !== id);
-          engine.enemiesKilled++;
-          engine.killPoints++;
-          engine.resources.add({ scrap: 30 });
-          if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
+          if (dead) killEnemy(engine, dead, p.sourceX, p.sourceY);
         });
-        for (let i = 0; i < 8; i++) {
-          const angle = (Math.PI * 2 / 8) * i;
-          engine.particles.push({ x: p.targetX, y: p.targetY, vx: Math.cos(angle) * 0.05, vy: Math.sin(angle) * 0.05, life: 15, color: '#fd79a8' });
+        for (let i = 0; i < 12; i++) {
+          const angle = (Math.PI * 2 / 12) * i;
+          const speed = 0.04 + Math.random() * 0.04;
+          engine.particles.push({ x: p.targetX, y: p.targetY, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 15 + Math.floor(Math.random() * 5), color: '#fd79a8' });
         }
       } else {
         const target = engine.enemies.find(e => e.id === p.targetId);
         if (target) {
-          target.health -= p.damage;
+          applyHitEffects(engine, target, p);
           if (target.health <= 0) {
             engine.enemies = engine.enemies.filter(e => e.id !== target.id);
-            engine.enemiesKilled++;
-            engine.killPoints++;
-            engine.resources.add({ scrap: 30 });
-            if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
+            killEnemy(engine, target, p.sourceX, p.sourceY);
           }
         }
       }
@@ -274,11 +337,12 @@ export function updateDrones(engine: GameEngine) {
       if (dist < 1.5 && Math.random() > 0.88) {
         const hMult = 1 + (hangarLevel - 1) * 0.5;
         const dmgMult = hMod === ModuleType.DAMAGE_AMP ? 1.4 : 1;
-        const dmg = (BUILDING_STATS[TileType.DRONE_HANGAR]?.damage || 25) * hMult * engine.dataVaultBuff * dmgMult;
+        const dmg = (BUILDING_STATS[TileType.DRONE_HANGAR]?.damage || 25) * hMult * engine.dataVaultBuff * dmgMult * engine.prestigeDamageMult;
         engine.projectiles.push({
           id: Math.random().toString(36), x: d.x, y: d.y,
           targetX: ne.x, targetY: ne.y, targetId: ne.id,
           speed: 0.5, color: '#0984e3', damage: dmg,
+          sourceX: d.hangarX, sourceY: d.hangarY
         });
       }
     } else {
@@ -304,7 +368,10 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
           engine.grid.shields[ty][tx] -= absorbed;
           dmg -= absorbed;
         }
-        if (dmg > 0) engine.grid.healths[ty][tx] -= dmg;
+        if (dmg > 0) {
+          engine.grid.healths[ty][tx] -= dmg;
+          engine.addDamageNumber(tx + 0.5, ty + 0.3, dmg, '#ff6b6b');
+        }
         e.lastHit = timestamp;
         if (engine.grid.healths[ty][tx] <= 0) {
           if (tile === TileType.CORE) engine.gameOver = true;
@@ -334,12 +401,15 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
       }
     }
 
+    // Slow module hit check
+    const moduleSlowFactor = (e.slowedUntil && Date.now() < e.slowedUntil) ? 0.7 : 1;
+
     const dx = 15 - e.x;
     const dy = 15 - e.y;
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d > 0.1) {
-      e.x += (dx / d) * e.speed * slowFactor;
-      e.y += (dy / d) * e.speed * slowFactor;
+      e.x += (dx / d) * e.speed * slowFactor * moduleSlowFactor;
+      e.y += (dy / d) * e.speed * slowFactor * moduleSlowFactor;
     }
     return true;
   });
