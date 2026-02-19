@@ -5,6 +5,10 @@ import { detonateMines, moveEnemies, turretLogic, updateProjectiles, updateParti
 import { loadUnlocks, saveUnlocks, resetUnlocks as resetUnlocksStorage, STARTER_BUILDINGS } from './TechTree';
 import { loadPrestige, savePrestige, calcPrestigeEarned } from './Prestige';
 import type { PrestigeData } from './Prestige';
+import { createMarketState, tickMarketPrices, executeTrade, TRADE_ROUTES } from './Market';
+import type { MarketState } from './Market';
+import { createResearchState, computeResearchBuffs, getResearchLevel, getResearchCost, canResearch, RESEARCH_NODES } from './Research';
+import type { ResearchState, ResearchBuffs } from './Research';
 import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
 import { DIFFICULTY_PRESETS } from './types';
 import type { TechNode } from './TechTree';
@@ -35,6 +39,13 @@ export class GameEngine {
   prestige: PrestigeData;
   prestigeEarned: number = 0;
   prestigeAwarded: boolean = false;
+
+  // Market
+  market: MarketState;
+
+  // Research 2.0
+  research: ResearchState;
+  researchBuffs: ResearchBuffs;
 
   lastTick: number = 0;
   tickRate: number = 1000;
@@ -79,6 +90,9 @@ export class GameEngine {
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
     this.unlockedBuildings = loadUnlocks();
     this.prestige = loadPrestige();
+    this.market = createMarketState();
+    this.research = createResearchState();
+    this.researchBuffs = computeResearchBuffs(this.research);
     this.applyPrestigeStartBonuses();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -147,6 +161,9 @@ export class GameEngine {
     this.prestigeEarned = 0;
     this.prestigeAwarded = false;
     this.prestige = loadPrestige();
+    this.market = createMarketState();
+    this.research = createResearchState();
+    this.researchBuffs = computeResearchBuffs(this.research);
     this.applyPrestigeStartBonuses();
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
   }
@@ -221,6 +238,8 @@ export class GameEngine {
       waveActive: this.waveActive,
       tileStats: Object.fromEntries(this.tileStats),
       globalStats: this.globalStats,
+      market: this.market,
+      research: this.research,
     };
     localStorage.setItem('rectangular_save', JSON.stringify(state));
   }
@@ -281,6 +300,13 @@ export class GameEngine {
       this.tileStats = new Map(Object.entries(s.tileStats || {})) as Map<string, TileStats>;
       this.globalStats = s.globalStats || { totalDamage: 0 };
 
+      // Market & Research
+      if (s.market) this.market = s.market;
+      if (s.research) {
+        this.research = s.research;
+        this.researchBuffs = computeResearchBuffs(this.research);
+      }
+
       return true;
     } catch { return false; }
   }
@@ -298,7 +324,7 @@ export class GameEngine {
     if (!stats || !stats.cost) return { scrap: 0 };
     const count = this.purchasedCounts[type] || 0;
     const inc = stats.costIncrease || {};
-    const cm = this.prestigeCostMult;
+    const cm = this.prestigeCostMult * this.researchBuffs.costMult;
     return {
       energy: Math.floor(((stats.cost.energy || 0) + (inc.energy || 0) * count) * cm),
       scrap: Math.floor(((stats.cost.scrap || 0) + (inc.scrap || 0) * count) * cm),
@@ -433,6 +459,8 @@ export class GameEngine {
             if (consumes.electronics) consumes.electronics *= 0.5;
             if (consumes.data) consumes.data *= 0.5;
           }
+          // Research: energy consume reduction
+          if (consumes.energy) consumes.energy *= this.researchBuffs.energyConsumeMult;
           if (!this.resources.canAfford(consumes)) continue;
           this.resources.spend(consumes);
           if (consumes.energy) tickExpense.energy += consumes.energy;
@@ -444,9 +472,13 @@ export class GameEngine {
 
         // Income
         if (stats.income) {
-          const incomeMult = (mod === ModuleType.OVERCHARGE ? mult * 1.6 : mult) * this.prestigeIncomeMult;
+          const incomeMult = (mod === ModuleType.OVERCHARGE ? mult * 1.6 : mult) * this.prestigeIncomeMult * this.researchBuffs.incomeMult;
           const doubleRoll = mod === ModuleType.DOUBLE_YIELD && Math.random() < 0.2 ? 2 : 1;
           const income = { ...stats.income };
+          // Research: data output boost for labs
+          if (type === TileType.LAB && income.data) {
+            income.data *= this.researchBuffs.dataOutputMult;
+          }
           if (income.energy) { income.energy *= incomeMult * doubleRoll; tickIncome.energy += income.energy; }
           if (income.scrap) { income.scrap *= incomeMult * doubleRoll; tickIncome.scrap += income.scrap; }
           if (income.steel) { income.steel *= incomeMult * doubleRoll; tickIncome.steel += income.steel; }
@@ -464,7 +496,7 @@ export class GameEngine {
 
         // Repair Bay
         if (type === TileType.REPAIR_BAY) {
-          const healAmount = 50 * mult;
+          const healAmount = 50 * mult * this.researchBuffs.repairMult;
           const range = (stats.range || 3) + (mod === ModuleType.RANGE_BOOST ? 3 : 0);
           for (let dy = -range; dy <= range; dy++) {
             for (let dx = -range; dx <= range; dx++) {
@@ -483,7 +515,7 @@ export class GameEngine {
 
         // Shield Generator
         if (type === TileType.SHIELD_GENERATOR) {
-          const cap = 500 * mult;
+          const cap = 500 * mult * this.researchBuffs.shieldMult;
           const range = (stats.range || 4) + (mod === ModuleType.RANGE_BOOST ? 3 : 0);
           for (let dy = -range; dy <= range; dy++) {
             for (let dx = -range; dx <= range; dx++) {
@@ -512,6 +544,30 @@ export class GameEngine {
       electronics: Math.round((tickIncome.electronics - tickExpense.electronics) * 10) / 10,
       data: Math.round((tickIncome.data - tickExpense.data) * 10) / 10,
     };
+
+    // Market price recovery
+    tickMarketPrices(this.market);
+  }
+
+  // ── Market ─────────────────────────────────────────────────
+
+  executeTrade(routeIndex: number, amount: number): boolean {
+    const route = TRADE_ROUTES[routeIndex];
+    if (!route) return false;
+    return executeTrade(route, amount, this.market, this.resources.state);
+  }
+
+  // ── Research 2.0 ───────────────────────────────────────────
+
+  buyResearch(nodeId: string): boolean {
+    const node = RESEARCH_NODES.find(n => n.id === nodeId);
+    if (!node) return false;
+    if (!canResearch(this.research, node, this.resources.state.data)) return false;
+    const cost = getResearchCost(node, getResearchLevel(this.research, nodeId));
+    this.resources.state.data -= cost;
+    this.research.levels[nodeId] = (this.research.levels[nodeId] || 0) + 1;
+    this.researchBuffs = computeResearchBuffs(this.research);
+    return true;
   }
 
   // ── Spawning ───────────────────────────────────────────────

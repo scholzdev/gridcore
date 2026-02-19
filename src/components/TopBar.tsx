@@ -26,6 +26,8 @@ interface TopBarProps {
   onToggleTechTree: () => void;
   onTogglePrestige: () => void;
   onToggleStats: () => void;
+  onToggleMarket: () => void;
+  onToggleResearch: () => void;
   onSave: () => void;
   onLoad: () => void;
   hasSave: boolean;
@@ -34,7 +36,7 @@ interface TopBarProps {
 export const TopBar = ({
   paused, isGameOver, difficulty, gameMode, gameStats, coreHealth, resources, netIncome,
   killPoints, showTechTree, waveInfo, onTogglePause, onRestart, onToggleTechTree,
-  onTogglePrestige, onToggleStats, onSave, onLoad, hasSave
+  onTogglePrestige, onToggleStats, onToggleMarket, onToggleResearch, onSave, onLoad, hasSave
 }: TopBarProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -102,6 +104,16 @@ export const TopBar = ({
         padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
         backgroundColor: '#2980b9', color: '#fff', border: 'none'
       }}>📊 STATS</button>
+
+      <button onClick={onToggleMarket} style={{
+        padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#00b894', color: '#fff', border: 'none'
+      }}>🏪 MARKT</button>
+
+      <button onClick={onToggleResearch} style={{
+        padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#6c5ce7', color: '#fff', border: 'none'
+      }}>🔬 FORSCHUNG</button>
 
       <button onClick={onSave} style={{
         padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',

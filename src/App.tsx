@@ -14,6 +14,10 @@ import { TechTreeOverlay } from './components/TechTreeOverlay';
 import { Tooltip } from './components/Tooltip';
 import { PrestigeOverlay } from './components/PrestigeOverlay';
 import { StatsOverlay } from './components/StatsOverlay';
+import { MarketOverlay } from './components/MarketOverlay';
+import { ResearchOverlay } from './components/ResearchOverlay';
+import type { MarketState } from './game/Market';
+import type { ResearchState } from './game/Research';
 
 import { BUILDING_NAMES } from './components/constants';
 
@@ -54,6 +58,10 @@ function App() {
   const [tileStats, setTileStats] = useState<Map<string, TileStats>>(new Map());
   const [globalStats, setGlobalStats] = useState({ totalDamage: 0 });
   const [hasSave, setHasSave] = useState(() => localStorage.getItem('rectangular_save') !== null);
+  const [showMarket, setShowMarket] = useState(false);
+  const [showResearch, setShowResearch] = useState(false);
+  const [marketState, setMarketState] = useState<MarketState>({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
+  const [researchState, setResearchState] = useState<ResearchState>({ levels: {} });
 
   // ── Game Loop ──────────────────────────────────────────────
 
@@ -82,6 +90,8 @@ function App() {
       setPrestigeData({ ...engineRef.current.prestige });
       setTileStats(new Map(engineRef.current.tileStats));
       setGlobalStats({ ...engineRef.current.globalStats });
+      setMarketState({ ...engineRef.current.market, prices: { ...engineRef.current.market.prices } });
+      setResearchState({ ...engineRef.current.research, levels: { ...engineRef.current.research.levels } });
       if (engineRef.current.gameMode === 'wellen') {
         setWaveInfo({
           wave: engineRef.current.currentWave,
@@ -109,6 +119,8 @@ function App() {
       if (e.key === 'r' || e.key === 'R') { if (engineRef.current?.gameOver) handleRestart(); }
       if (e.key === 't' || e.key === 'T') setShowTechTree(prev => !prev);
       if (e.key === 's' || e.key === 'S') setShowStats(prev => !prev);
+      if (e.key === 'm' || e.key === 'M') setShowMarket(prev => !prev);
+      if (e.key === 'f' || e.key === 'F') setShowResearch(prev => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -149,6 +161,10 @@ function App() {
     setWaveInfo({ wave: 0, buildPhase: true, buildTimer: 20, enemiesLeft: 0, enemiesTotal: 0 });
     setSelectedBuilding(TileType.SOLAR_PANEL);
     setSelectedModule(ModuleType.NONE);
+    setShowMarket(false);
+    setShowResearch(false);
+    setMarketState({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
+    setResearchState({ levels: {} });
   };
 
   const handleUnlock = (node: TechNode) => {
@@ -205,6 +221,26 @@ function App() {
       setIsGameOver(false);
       setPaused(false);
       setKillPoints(engineRef.current.killPoints);
+      setMarketState({ ...engineRef.current.market, prices: { ...engineRef.current.market.prices } });
+      setResearchState({ ...engineRef.current.research, levels: { ...engineRef.current.research.levels } });
+    }
+  };
+
+  const handleTrade = (routeIndex: number, amount: number): boolean => {
+    if (!engineRef.current) return false;
+    const ok = engineRef.current.executeTrade(routeIndex, amount);
+    if (ok) {
+      setResources({ ...engineRef.current.resources.state });
+      setMarketState({ ...engineRef.current.market, prices: { ...engineRef.current.market.prices } });
+    }
+    return ok;
+  };
+
+  const handleResearch = (nodeId: string) => {
+    if (!engineRef.current) return;
+    if (engineRef.current.buyResearch(nodeId)) {
+      setResources({ ...engineRef.current.resources.state });
+      setResearchState({ ...engineRef.current.research, levels: { ...engineRef.current.research.levels } });
     }
   };
 
@@ -385,6 +421,22 @@ function App() {
           onClose={() => setShowStats(false)}
         />
       )}
+      {showMarket && (
+        <MarketOverlay
+          market={marketState}
+          resources={resources}
+          onTrade={handleTrade}
+          onClose={() => setShowMarket(false)}
+        />
+      )}
+      {showResearch && (
+        <ResearchOverlay
+          research={researchState}
+          dataAvailable={resources.data}
+          onResearch={handleResearch}
+          onClose={() => setShowResearch(false)}
+        />
+      )}
 
       <TopBar
         paused={paused}
@@ -403,6 +455,8 @@ function App() {
         onToggleTechTree={() => setShowTechTree(prev => !prev)}
         onTogglePrestige={() => setShowPrestige(prev => !prev)}
         onToggleStats={() => setShowStats(prev => !prev)}
+        onToggleMarket={() => setShowMarket(prev => !prev)}
+        onToggleResearch={() => setShowResearch(prev => !prev)}
         onSave={handleSave}
         onLoad={handleLoad}
         hasSave={hasSave}
