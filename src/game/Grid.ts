@@ -84,12 +84,12 @@ export const BUILDING_STATS: Record<number, Partial<Building>> = {
   [TileType.RADAR_STATION]: { health: 600, maxHealth: 600, range: 5, cost: { steel: 80, electronics: 40 }, costIncrease: { steel: 30, electronics: 20 }, consumes: { energy: 10 } },
   [TileType.DATA_VAULT]: { health: 1500, maxHealth: 1500, cost: { steel: 200, electronics: 150, data: 100 }, costIncrease: { steel: 100, electronics: 75, data: 50 }, consumes: { energy: 25, data: 10 } },
   [TileType.PLASMA_CANNON]: { health: 4000, maxHealth: 4000, range: 10, damage: 300, cost: { steel: 500, electronics: 400, data: 200 }, costIncrease: { steel: 300, electronics: 200, data: 100 }, consumes: { energy: 45 } },
-  [TileType.RECYCLER]: { health: 1200, maxHealth: 1200, cost: { steel: 150, electronics: 100, data: 50 }, costIncrease: { steel: 75, electronics: 50, data: 25 }, consumes: { energy: 40, scrap: 15 }, income: { steel: 8, electronics: 6 } },
-  [TileType.LASER_TURRET]: { health: 1500, maxHealth: 1500, range: 8, damage: 20, cost: { steel: 200, electronics: 150 }, costIncrease: { steel: 100, electronics: 75 }, consumes: { energy: 30 } },
+  [TileType.RECYCLER]: { health: 1200, maxHealth: 1200, cost: { steel: 150, electronics: 100, data: 50 }, costIncrease: { steel: 75, electronics: 50, data: 25 }, consumes: { energy: 40, scrap: 15 }, income: { steel: 10, electronics: 8 } },
+  [TileType.LASER_TURRET]: { health: 1500, maxHealth: 1500, range: 8, damage: 35, cost: { steel: 200, electronics: 150 }, costIncrease: { steel: 100, electronics: 75 }, consumes: { energy: 30 } },
   [TileType.MINEFIELD]: { health: 200, maxHealth: 200, damage: 250, cost: { scrap: 60, steel: 30 }, costIncrease: { scrap: 20, steel: 10 } },
   [TileType.DRONE_HANGAR]: { health: 2000, maxHealth: 2000, range: 10, damage: 25, cost: { steel: 250, electronics: 200, data: 50 }, costIncrease: { steel: 125, electronics: 100, data: 25 }, consumes: { energy: 35 } },
-  [TileType.CRYSTAL_DRILL]: { health: 600, maxHealth: 600, cost: { scrap: 80, steel: 40 }, costIncrease: { scrap: 30, steel: 15 }, consumes: { energy: 15 }, income: { electronics: 8 } },
-  [TileType.STEEL_SMELTER]: { health: 600, maxHealth: 600, cost: { scrap: 60, energy: 20 }, costIncrease: { scrap: 20, energy: 10 }, consumes: { energy: 10 }, income: { steel: 12 } },
+  [TileType.CRYSTAL_DRILL]: { health: 600, maxHealth: 600, cost: { scrap: 80, steel: 40 }, costIncrease: { scrap: 30, steel: 15 }, consumes: { energy: 20 }, income: { electronics: 5 } },
+  [TileType.STEEL_SMELTER]: { health: 600, maxHealth: 600, cost: { scrap: 60, energy: 20 }, costIncrease: { scrap: 20, energy: 10 }, consumes: { energy: 12 }, income: { steel: 8 } },
 };
 
 export class GameGrid {

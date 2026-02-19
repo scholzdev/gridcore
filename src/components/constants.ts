@@ -38,14 +38,14 @@ export const BUILDING_DESC: Record<number, string> = {
   [TileType.RADAR_STATION]: 'Erhöht Geschützreichweite. Reichweite 5. Verbraucht Energie.',
   [TileType.REPAIR_BAY]: 'Repariert Gebäude im Bereich. Reichweite 3. Verbraucht Energie.',
   [TileType.FOUNDRY]: 'Wandelt Schrott+Energie → Stahl um.',
-  [TileType.FABRICATOR]: 'Wandelt Schrott+Energie → E-Komp um.',
-  [TileType.RECYCLER]: 'Wandelt Schrott+Energie → Stahl+E-Komp um.',
-  [TileType.LAB]: 'Wandelt Energie+E-Komp → Daten um.',
+  [TileType.FABRICATOR]: 'Wandelt Schrott+Energie → Elektronik um.',
+  [TileType.RECYCLER]: 'Wandelt Schrott+Energie → Stahl+Elektronik um.',
+  [TileType.LAB]: 'Wandelt Energie+Elektronik → Daten um.',
   [TileType.DATA_VAULT]: 'Verstärkt Geschützschaden +15%. Verbraucht Energie+Daten.',
   [TileType.LASER_TURRET]: 'Kontinuierlicher Laserstrahl. Schaden steigt mit Fokuszeit bis 3×.',
   [TileType.MINEFIELD]: 'Explodiert bei Feindkontakt. Flächenschaden. Einmalverwendung.',
   [TileType.DRONE_HANGAR]: 'Spawnt autonome Drohnen die Gegner verfolgen. 2+Level Drohnen.',
-  [TileType.CRYSTAL_DRILL]: 'Baut E-Komp direkt aus Erz ab. Auf Erzvorkommen platzieren. Verbraucht Energie.',
+  [TileType.CRYSTAL_DRILL]: 'Baut Elektronik direkt aus Erz ab. Auf Erzvorkommen platzieren. Verbraucht Energie.',
   [TileType.STEEL_SMELTER]: 'Schmilzt Stahl direkt aus Erz. Auf Erzvorkommen platzieren. Verbraucht Energie.',
 };
 

@@ -20,12 +20,12 @@ export const TECH_TREE: TechNode[] = [
   { id: 'storm', name: 'Sturmgeschütz', unlocks: TileType.HEAVY_TURRET, killCost: 15, tier: 2, description: 'Hoher Schaden, große Reichweite' },
   { id: 'tesla', name: 'Teslaspule', unlocks: TileType.TESLA_COIL, killCost: 15, tier: 2, description: 'Trifft 3+ Ziele gleichzeitig' },
   { id: 'shield', name: 'Schildgenerator', unlocks: TileType.SHIELD_GENERATOR, killCost: 15, tier: 2, description: 'Schirmt Gebäude ab' },
-  { id: 'efab', name: 'E-Fabrik', unlocks: TileType.FABRICATOR, killCost: 15, tier: 2, description: 'Schrott+Energie → E-Komp' },
-  { id: 'crystal', name: 'Kristallbohrer', unlocks: TileType.CRYSTAL_DRILL, killCost: 15, tier: 2, description: 'Erz → E-Komp direkt' },
+  { id: 'efab', name: 'E-Fabrik', unlocks: TileType.FABRICATOR, killCost: 15, tier: 2, description: 'Schrott+Energie → Elektronik' },
+  { id: 'crystal', name: 'Kristallbohrer', unlocks: TileType.CRYSTAL_DRILL, killCost: 15, tier: 2, description: 'Erz → Elektronik direkt' },
   // Tier 3 - 30 Kills
   { id: 'radar', name: 'Radarstation', unlocks: TileType.RADAR_STATION, killCost: 30, tier: 3, description: 'Erhöht Geschützreichweite' },
-  { id: 'recycler', name: 'Recycler', unlocks: TileType.RECYCLER, killCost: 30, tier: 3, description: 'Stahl+E-Komp aus Schrott' },
-  { id: 'lab', name: 'Forschungslabor', unlocks: TileType.LAB, killCost: 30, tier: 3, description: 'Energie+E-Komp → Daten' },
+  { id: 'recycler', name: 'Recycler', unlocks: TileType.RECYCLER, killCost: 30, tier: 3, description: 'Stahl+Elektronik aus Schrott' },
+  { id: 'lab', name: 'Forschungslabor', unlocks: TileType.LAB, killCost: 30, tier: 3, description: 'Energie+Elektronik → Daten' },
   { id: 'laser', name: 'Laserturm', unlocks: TileType.LASER_TURRET, killCost: 30, tier: 3, description: 'Strahl mit Aufladung' },
   // Tier 4 - 50 Kills
   { id: 'plasma', name: 'Plasmakanone', unlocks: TileType.PLASMA_CANNON, killCost: 50, tier: 4, description: 'Massiver Flächenschaden' },

@@ -21,7 +21,7 @@ export const Tooltip = ({ x, y, data }: TooltipProps) => (
       {data.stats.income?.scrap && <div>Schrott: <span style={{ color: '#9b59b6', fontWeight: 'bold' }}>+{data.stats.income.scrap}/s</span></div>}
       {data.stats.income?.energy && <div>Energie: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>+{data.stats.income.energy}/s</span></div>}
       {data.stats.income?.steel && <div>Stahl: <span style={{ color: '#e67e22', fontWeight: 'bold' }}>+{data.stats.income.steel}/s</span></div>}
-      {data.stats.income?.electronics && <div>E-Komp: <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>+{data.stats.income.electronics}/s</span></div>}
+      {data.stats.income?.electronics && <div>Elektronik: <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>+{data.stats.income.electronics}/s</span></div>}
       {data.stats.income?.data && <div>Daten: <span style={{ color: '#3498db', fontWeight: 'bold' }}>+{data.stats.income.data}/s</span></div>}
       {data.stats.damage && <div>Schaden: <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>{data.stats.damage}</span>{data.stats.splash ? ' (Fläche)' : ''}</div>}
       {data.stats.range && <div style={{ opacity: 0.7 }}>Reichweite: {data.stats.range}</div>}

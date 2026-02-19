@@ -271,7 +271,7 @@ function App() {
     if (cost.scrap) p.push(`${cost.scrap} Schrott`);
     if (cost.energy) p.push(`${cost.energy} Energie`);
     if (cost.steel) p.push(`${cost.steel} Stahl`);
-    if (cost.electronics) p.push(`${cost.electronics} E-Komp`);
+    if (cost.electronics) p.push(`${cost.electronics} Elektronik`);
     if (cost.data) p.push(`${cost.data} Daten`);
     return p.join(' / ');
   };

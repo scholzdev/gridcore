@@ -26,7 +26,7 @@ export const TechNodeCard = ({ node, isUnlocked, canAfford, onUnlock }: TechNode
     if (c.scrap) p.push(`${c.scrap} Schrott`);
     if (c.energy) p.push(`${c.energy} Energie`);
     if (c.steel) p.push(`${c.steel} Stahl`);
-    if (c.electronics) p.push(`${c.electronics} E-Komp`);
+    if (c.electronics) p.push(`${c.electronics} Elektronik`);
     if (c.data) p.push(`${c.data} Daten`);
     return p.join(' / ');
   })();
@@ -43,12 +43,12 @@ export const TechNodeCard = ({ node, isUnlocked, canAfford, onUnlock }: TechNode
   if (bStats?.income?.energy) incParts.push(`+${bStats.income.energy} Energie`);
   if (bStats?.income?.scrap) incParts.push(`+${bStats.income.scrap} Schrott`);
   if (bStats?.income?.steel) incParts.push(`+${bStats.income.steel} Stahl`);
-  if (bStats?.income?.electronics) incParts.push(`+${bStats.income.electronics} E-Komp`);
+  if (bStats?.income?.electronics) incParts.push(`+${bStats.income.electronics} Elektronik`);
   if (bStats?.income?.data) incParts.push(`+${bStats.income.data} Daten`);
   const conParts: string[] = [];
   if (bStats?.consumes?.energy) conParts.push(`${bStats.consumes.energy} Energie`);
   if (bStats?.consumes?.scrap) conParts.push(`${bStats.consumes.scrap} Schrott`);
-  if (bStats?.consumes?.electronics) conParts.push(`${bStats.consumes.electronics} E-Komp`);
+  if (bStats?.consumes?.electronics) conParts.push(`${bStats.consumes.electronics} Elektronik`);
   if (bStats?.consumes?.data) conParts.push(`${bStats.consumes.data} Daten`);
 
   const showDetails = hover && shift;
@@ -112,7 +112,7 @@ export const TechNodeCard = ({ node, isUnlocked, canAfford, onUnlock }: TechNode
               {bStats?.income?.energy && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Energie:</span> {scaleVals(bStats.income.energy)}/s</div>}
               {bStats?.income?.scrap && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Schrott:</span> {scaleVals(bStats.income.scrap)}/s</div>}
               {bStats?.income?.steel && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Stahl:</span> {scaleVals(bStats.income.steel)}/s</div>}
-              {bStats?.income?.electronics && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>E-Komp:</span> {scaleVals(bStats.income.electronics)}/s</div>}
+              {bStats?.income?.electronics && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Elektronik:</span> {scaleVals(bStats.income.electronics)}/s</div>}
               {bStats?.income?.data && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Daten:</span> {scaleVals(bStats.income.data)}/s</div>}
               <div><span style={{ color: '#7f8c8d' }}>HP:</span> {scaleVals(bStats?.maxHealth || 0)}</div>
               {conParts.length > 0 && <div style={{ color: '#e74c3c', marginTop: '2px' }}>Verbraucht: {conParts.join(', ')}/s (fest)</div>}

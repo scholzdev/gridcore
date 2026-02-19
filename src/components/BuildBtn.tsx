@@ -58,12 +58,12 @@ export const BuildBtn = ({ type, selected, set, label, cost, color, affordable =
   if (stats?.income?.energy) incParts.push(`+${stats.income.energy} Energie`);
   if (stats?.income?.scrap) incParts.push(`+${stats.income.scrap} Schrott`);
   if (stats?.income?.steel) incParts.push(`+${stats.income.steel} Stahl`);
-  if (stats?.income?.electronics) incParts.push(`+${stats.income.electronics} E-Komp`);
+  if (stats?.income?.electronics) incParts.push(`+${stats.income.electronics} Elektronik`);
   if (stats?.income?.data) incParts.push(`+${stats.income.data} Daten`);
   const conParts: string[] = [];
   if (stats?.consumes?.energy) conParts.push(`${stats.consumes.energy} Energie`);
   if (stats?.consumes?.scrap) conParts.push(`${stats.consumes.scrap} Schrott`);
-  if (stats?.consumes?.electronics) conParts.push(`${stats.consumes.electronics} E-Komp`);
+  if (stats?.consumes?.electronics) conParts.push(`${stats.consumes.electronics} Elektronik`);
   if (stats?.consumes?.data) conParts.push(`${stats.consumes.data} Daten`);
 
   const showScaling = hover && shift;
@@ -110,7 +110,7 @@ export const BuildBtn = ({ type, selected, set, label, cost, color, affordable =
               {stats?.income?.energy && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Energie:</span> {scaleVals(stats.income.energy)}/s</div>}
               {stats?.income?.scrap && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Schrott:</span> {scaleVals(stats.income.scrap)}/s</div>}
               {stats?.income?.steel && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Stahl:</span> {scaleVals(stats.income.steel)}/s</div>}
-              {stats?.income?.electronics && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>E-Komp:</span> {scaleVals(stats.income.electronics)}/s</div>}
+              {stats?.income?.electronics && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Elektronik:</span> {scaleVals(stats.income.electronics)}/s</div>}
               {stats?.income?.data && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Daten:</span> {scaleVals(stats.income.data)}/s</div>}
               <div><span style={{ color: '#7f8c8d' }}>HP:</span> {scaleVals(stats?.maxHealth || 0)}</div>
               {conParts.length > 0 && <div style={{ color: '#e74c3c', marginTop: '2px' }}>Verbraucht: {conParts.join(', ')}/s (fest)</div>}

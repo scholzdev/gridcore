@@ -15,7 +15,7 @@ export const ModuleSidebar = ({ selectedModule, setSelectedModule, setSelectedBu
       const modType = Number(key) as ModuleType;
       const costParts: string[] = [];
       if (def.cost.steel) costParts.push(`${def.cost.steel} Stahl`);
-      if (def.cost.electronics) costParts.push(`${def.cost.electronics} E-Komp`);
+      if (def.cost.electronics) costParts.push(`${def.cost.electronics} Elektronik`);
       if (def.cost.data) costParts.push(`${def.cost.data} Daten`);
       return (
         <button key={key} onClick={() => { setSelectedModule(modType === selectedModule ? ModuleType.NONE : modType); setSelectedBuilding(TileType.SOLAR_PANEL); }} style={{
