@@ -81,12 +81,12 @@ export interface Building {
 
 export const BUILDING_STATS: Record<number, Partial<Building>> = {
   [TileType.CORE]: { health: 5000, maxHealth: 5000, income: { energy: 1, scrap: 1 } },
-  [TileType.SOLAR_PANEL]: { health: 400, maxHealth: 400, cost: { scrap: 40 }, costIncrease: { scrap: 10 }, income: { energy: 20 } },
+  [TileType.SOLAR_PANEL]: { health: 400, maxHealth: 400, cost: { scrap: 40 }, costIncrease: { scrap: 10 }, income: { energy: 15 } },
   [TileType.MINER]: { health: 500, maxHealth: 500, cost: { scrap: 40, energy: 10 }, costIncrease: { scrap: 15, energy: 5 }, income: { scrap: 25 } },
   [TileType.WALL]: { health: 2500, maxHealth: 2500, cost: { scrap: 15 }, costIncrease: { scrap: 5 } },
   [TileType.TURRET]: { health: 800, maxHealth: 800, range: 6, damage: 30, cost: { scrap: 150, energy: 50 }, costIncrease: { scrap: 100, energy: 15 } },
-  [TileType.FOUNDRY]: { health: 1000, maxHealth: 1000, cost: { scrap: 120, energy: 40 }, costIncrease: { scrap: 40, energy: 20 }, consumes: { energy: 15, scrap: 10 }, income: { steel: 10 } },
-  [TileType.FABRICATOR]: { health: 1000, maxHealth: 1000, cost: { scrap: 200, energy: 100 }, costIncrease: { scrap: 70, energy: 50 }, consumes: { energy: 20, scrap: 10 }, income: { electronics: 5 } },
+  [TileType.FOUNDRY]: { health: 1000, maxHealth: 1000, cost: { scrap: 120, energy: 40 }, costIncrease: { scrap: 40, energy: 20 }, consumes: { energy: 15, scrap: 5 }, income: { steel: 12 } },
+  [TileType.FABRICATOR]: { health: 1000, maxHealth: 1000, cost: { scrap: 200, energy: 100 }, costIncrease: { scrap: 70, energy: 50 }, consumes: { energy: 20 }, income: { electronics: 8 } },
   [TileType.LAB]: { health: 800, maxHealth: 800, cost: { steel: 80, electronics: 60 }, costIncrease: { steel: 40, electronics: 30 }, consumes: { energy: 45, electronics: 2 }, income: { data: 20 } },
   [TileType.HEAVY_TURRET]: { health: 3000, maxHealth: 3000, range: 12, damage: 150, cost: { steel: 300, electronics: 200 }, costIncrease: { steel: 200, electronics: 100 } },
   [TileType.REPAIR_BAY]: { health: 600, maxHealth: 600, range: 3, cost: { scrap: 80, energy: 30 }, costIncrease: { scrap: 30, energy: 10 }, consumes: { energy: 10 } },
@@ -97,9 +97,9 @@ export const BUILDING_STATS: Record<number, Partial<Building>> = {
   [TileType.DATA_VAULT]: { health: 1500, maxHealth: 1500, cost: { steel: 200, electronics: 150, data: 100 }, costIncrease: { steel: 100, electronics: 75, data: 50 }, consumes: { energy: 25, data: 10 } },
   [TileType.PLASMA_CANNON]: { health: 4000, maxHealth: 4000, range: 10, damage: 300, cost: { steel: 500, electronics: 400, data: 200 }, costIncrease: { steel: 300, electronics: 200, data: 100 }, consumes: { energy: 45 } },
   [TileType.RECYCLER]: { health: 1200, maxHealth: 1200, cost: { steel: 150, electronics: 100, data: 50 }, costIncrease: { steel: 75, electronics: 50, data: 25 }, consumes: { energy: 40, scrap: 15 }, income: { steel: 10, electronics: 8 } },
-  [TileType.LASER_TURRET]: { health: 1500, maxHealth: 1500, range: 8, damage: 35, cost: { steel: 200, electronics: 150 }, costIncrease: { steel: 100, electronics: 75 }, consumes: { energy: 30 } },
-  [TileType.MINEFIELD]: { health: 200, maxHealth: 200, damage: 250, cost: { scrap: 60, steel: 30 }, costIncrease: { scrap: 20, steel: 10 } },
-  [TileType.DRONE_HANGAR]: { health: 2000, maxHealth: 2000, range: 10, damage: 25, cost: { steel: 250, electronics: 200, data: 50 }, costIncrease: { steel: 125, electronics: 100, data: 25 }, consumes: { energy: 35 } },
+  [TileType.LASER_TURRET]: { health: 1500, maxHealth: 1500, range: 8, damage: 50, cost: { steel: 200, electronics: 150 }, costIncrease: { steel: 100, electronics: 75 }, consumes: { energy: 30 } },
+  [TileType.MINEFIELD]: { health: 200, maxHealth: 200, damage: 400, cost: { scrap: 60, steel: 30 }, costIncrease: { scrap: 20, steel: 10 } },
+  [TileType.DRONE_HANGAR]: { health: 2000, maxHealth: 2000, range: 10, damage: 45, cost: { steel: 250, electronics: 200, data: 50 }, costIncrease: { steel: 125, electronics: 100, data: 25 }, consumes: { energy: 35 } },
   [TileType.CRYSTAL_DRILL]: { health: 600, maxHealth: 600, cost: { scrap: 80, steel: 40 }, costIncrease: { scrap: 30, steel: 15 }, consumes: { energy: 20 }, income: { electronics: 5 } },
   [TileType.STEEL_SMELTER]: { health: 600, maxHealth: 600, cost: { scrap: 60, energy: 20 }, costIncrease: { scrap: 20, energy: 10 }, consumes: { energy: 12 }, income: { steel: 8 } },
 };
@@ -111,6 +111,8 @@ export class GameGrid {
   shields: number[][];
   modules: number[][];  // ModuleType per tile
   levels: number[][];
+  coreX: number = -1;
+  coreY: number = -1;
 
   constructor(size: number = 30) {
     this.size = size;
@@ -125,10 +127,26 @@ export class GameGrid {
       const y = Math.floor(Math.random() * size);
       this.tiles[y][x] = TileType.ORE_PATCH;
     }
-    const mid = 15;
-    this.tiles[mid][mid] = TileType.CORE;
-    this.healths[mid][mid] = BUILDING_STATS[TileType.CORE].health!;
-    this.levels[mid][mid] = 1;
+  }
+
+  placeCore(x: number, y: number): boolean {
+    if (x < 2 || y < 2 || x >= this.size - 2 || y >= this.size - 2) return false;
+    // Nicht auf Erz platzieren
+    if (this.tiles[y][x] === TileType.ORE_PATCH) return false;
+    // Clear ore patches around core (3x3)
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (this.tiles[y + dy][x + dx] === TileType.ORE_PATCH) {
+          this.tiles[y + dy][x + dx] = TileType.EMPTY;
+        }
+      }
+    }
+    this.tiles[y][x] = TileType.CORE;
+    this.healths[y][x] = BUILDING_STATS[TileType.CORE].health!;
+    this.levels[y][x] = 1;
+    this.coreX = x;
+    this.coreY = y;
+    return true;
   }
 
   placeBuilding(x: number, y: number, type: TileType): boolean {

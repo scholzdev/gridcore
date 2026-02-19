@@ -5,7 +5,8 @@ import type { GameEngine } from './Engine';
 function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?: number) {
   engine.enemiesKilled++;
   engine.killPoints++;
-  engine.resources.add({ scrap: 30 });
+  const killReward = Math.floor(30 + engine.gameTime * 0.1);
+  engine.resources.add({ scrap: killReward });
   if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
   if (sourceX !== undefined && sourceY !== undefined) engine.addTileKill(sourceX, sourceY);
   // Explosion effect — more particles on death
@@ -404,8 +405,8 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     // Slow module hit check
     const moduleSlowFactor = (e.slowedUntil && Date.now() < e.slowedUntil) ? 0.7 : 1;
 
-    const dx = 15 - e.x;
-    const dy = 15 - e.y;
+    const dx = engine.grid.coreX + 0.5 - e.x;
+    const dy = engine.grid.coreY + 0.5 - e.y;
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d > 0.1) {
       e.x += (dx / d) * e.speed * slowFactor * moduleSlowFactor;

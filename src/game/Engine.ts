@@ -68,6 +68,7 @@ export class GameEngine {
 
   // Game Mode
   gameMode: GameMode = 'endlos';
+  placingCore: boolean = true;
 
   // Wave Mode State
   currentWave: number = 0;
@@ -105,6 +106,13 @@ export class GameEngine {
 
   setGameMode(mode: GameMode) {
     this.gameMode = mode;
+  }
+
+  placeCore(x: number, y: number): boolean {
+    if (!this.placingCore) return false;
+    if (!this.grid.placeCore(x, y)) return false;
+    this.placingCore = false;
+    return true;
   }
 
   startNextWave() {
@@ -164,6 +172,7 @@ export class GameEngine {
     this.market = createMarketState();
     this.research = createResearchState();
     this.researchBuffs = computeResearchBuffs(this.research);
+    this.placingCore = true;
     this.applyPrestigeStartBonuses();
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
   }
@@ -219,7 +228,7 @@ export class GameEngine {
 
   saveGame() {
     const state = {
-      grid: { tiles: this.grid.tiles, healths: this.grid.healths, shields: this.grid.shields, modules: this.grid.modules, levels: this.grid.levels },
+      grid: { tiles: this.grid.tiles, healths: this.grid.healths, shields: this.grid.shields, modules: this.grid.modules, levels: this.grid.levels, coreX: this.grid.coreX, coreY: this.grid.coreY },
       resources: this.resources.state,
       enemies: this.enemies,
       gameTime: this.gameTime,
@@ -261,6 +270,9 @@ export class GameEngine {
           this.grid.levels[y][x] = s.grid.levels[y][x];
         }
       }
+      this.grid.coreX = s.grid.coreX ?? 15;
+      this.grid.coreY = s.grid.coreY ?? 15;
+      this.placingCore = false;
 
       // Resources
       this.resources.state = { ...s.resources };
@@ -371,6 +383,10 @@ export class GameEngine {
   // ── Main Loop ──────────────────────────────────────────────
 
   update(timestamp: number) {
+    if (this.placingCore) {
+      this.renderer.draw(this);
+      return;
+    }
     if (this.gameOver) {
       if (!this.prestigeAwarded) {
         this.prestigeEarned = calcPrestigeEarned(this.enemiesKilled, this.gameTime);

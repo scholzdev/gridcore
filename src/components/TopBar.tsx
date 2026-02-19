@@ -28,6 +28,7 @@ interface TopBarProps {
   onToggleStats: () => void;
   onToggleMarket: () => void;
   onToggleResearch: () => void;
+  onToggleGuide: () => void;
   onSave: () => void;
   onLoad: () => void;
   hasSave: boolean;
@@ -36,7 +37,7 @@ interface TopBarProps {
 export const TopBar = ({
   paused, isGameOver, difficulty, gameMode, gameStats, coreHealth, resources, netIncome,
   killPoints, showTechTree, waveInfo, onTogglePause, onRestart, onToggleTechTree,
-  onTogglePrestige, onToggleStats, onToggleMarket, onToggleResearch, onSave, onLoad, hasSave
+  onTogglePrestige, onToggleStats, onToggleMarket, onToggleResearch, onToggleGuide, onSave, onLoad, hasSave
 }: TopBarProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -54,6 +55,16 @@ export const TopBar = ({
         padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', fontFamily: 'monospace',
         backgroundColor: paused ? '#e74c3c' : '#27ae60', color: '#fff', border: 'none'
       }}>{paused ? '▶ WEITER' : '⏸ PAUSE'}</button>
+
+      <button onClick={onSave} style={{
+        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#27ae60', color: '#fff', border: 'none'
+      }}>💾</button>
+
+      {hasSave && <button onClick={onLoad} style={{
+        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#3498db', color: '#fff', border: 'none'
+      }}>📂</button>}
 
       {isGameOver && <button onClick={onRestart} style={{
         padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', fontFamily: 'monospace',
@@ -115,15 +126,10 @@ export const TopBar = ({
         backgroundColor: '#6c5ce7', color: '#fff', border: 'none'
       }}>🔬 FORSCHUNG</button>
 
-      <button onClick={onSave} style={{
-        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',
-        backgroundColor: '#27ae60', color: '#fff', border: 'none'
-      }}>💾</button>
-
-      {hasSave && <button onClick={onLoad} style={{
-        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'monospace',
-        backgroundColor: '#3498db', color: '#fff', border: 'none'
-      }}>📂</button>}
+      <button onClick={onToggleGuide} style={{
+        padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#636e72', color: '#fff', border: 'none'
+      }}>📖 GUIDE</button>
 
       <div style={{ fontSize: '14px' }}>KERN: <span style={{ color: coreHealth.current < coreHealth.max * 0.3 ? '#e74c3c' : '#2d3436', fontWeight: 'bold' }}>{Math.max(0, Math.floor(coreHealth.current))}</span></div>
       <div style={{ width: '1px', height: '20px', backgroundColor: '#dfe4ea' }} />

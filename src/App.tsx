@@ -16,6 +16,8 @@ import { PrestigeOverlay } from './components/PrestigeOverlay';
 import { StatsOverlay } from './components/StatsOverlay';
 import { MarketOverlay } from './components/MarketOverlay';
 import { ResearchOverlay } from './components/ResearchOverlay';
+import { GuideOverlay } from './components/GuideOverlay';
+import { MobileWarning } from './components/MobileWarning';
 import type { MarketState } from './game/Market';
 import type { ResearchState } from './game/Research';
 
@@ -34,6 +36,7 @@ function App() {
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0, show: false });
   const [hoveredData, setHoveredData] = useState<any>(null);
   const [paused, setPaused] = useState(false);
+  const [placingCore, setPlacingCore] = useState(true);
   const [netIncome, setNetIncome] = useState({ energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 });
   const [isGameOver, setIsGameOver] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('leicht');
@@ -60,6 +63,7 @@ function App() {
   const [hasSave, setHasSave] = useState(() => localStorage.getItem('rectangular_save') !== null);
   const [showMarket, setShowMarket] = useState(false);
   const [showResearch, setShowResearch] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [marketState, setMarketState] = useState<MarketState>({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
   const [researchState, setResearchState] = useState<ResearchState>({ levels: {} });
 
@@ -77,9 +81,10 @@ function App() {
       engineRef.current.update(t);
       setResources({ ...engineRef.current.resources.state });
 
-      const mid = 15;
-      if (engineRef.current.grid.healths[mid][mid]) {
-        setCoreHealth({ current: engineRef.current.grid.healths[mid][mid], max: BUILDING_STATS[TileType.CORE].maxHealth! });
+      const cx = engineRef.current.grid.coreX;
+      const cy = engineRef.current.grid.coreY;
+      if (cx >= 0 && cy >= 0 && engineRef.current.grid.healths[cy][cx]) {
+        setCoreHealth({ current: engineRef.current.grid.healths[cy][cx], max: BUILDING_STATS[TileType.CORE].maxHealth! });
       }
 
       setGameStats({ time: engineRef.current.gameTime, killed: engineRef.current.enemiesKilled });
@@ -121,6 +126,7 @@ function App() {
       if (e.key === 's' || e.key === 'S') setShowStats(prev => !prev);
       if (e.key === 'm' || e.key === 'M') setShowMarket(prev => !prev);
       if (e.key === 'f' || e.key === 'F') setShowResearch(prev => !prev);
+      if (e.key === 'h' || e.key === 'H') setShowGuide(prev => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -144,6 +150,7 @@ function App() {
     setGameStats({ time: 0, killed: 0 });
     setNetIncome({ energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 });
     setPaused(false);
+    setPlacingCore(true);
     setIsGameOver(false);
     setGameStarted(false);
     setShowTechTree(false);
@@ -220,6 +227,7 @@ function App() {
       setNetIncome({ ...engineRef.current.netIncome });
       setIsGameOver(false);
       setPaused(false);
+      setPlacingCore(false);
       setKillPoints(engineRef.current.killPoints);
       setMarketState({ ...engineRef.current.market, prices: { ...engineRef.current.market.prices } });
       setResearchState({ ...engineRef.current.research, levels: { ...engineRef.current.research.levels } });
@@ -295,6 +303,15 @@ function App() {
     const { zoom } = engineRef.current;
     const worldX = Math.floor((e.clientX - rect.left) / zoom);
     const worldY = Math.floor((e.clientY - rect.top) / zoom);
+
+    // Core placement phase
+    if (engineRef.current.placingCore) {
+      if (engineRef.current.placeCore(worldX, worldY)) {
+        setPlacingCore(false);
+      }
+      return;
+    }
+
     const currentTile = engineRef.current.grid.tiles[worldY][worldX];
 
     if (selectedModule !== ModuleType.NONE) {
@@ -392,6 +409,7 @@ function App() {
 
   return (
     <div style={{ backgroundColor: '#f1f2f6', color: '#2d3436', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'monospace', overflow: 'hidden' }}>
+      <MobileWarning />
 
       {hoverPos.show && hoveredData && <Tooltip x={hoverPos.x} y={hoverPos.y} data={hoveredData} />}
       {showTechTree && (
@@ -437,6 +455,9 @@ function App() {
           onClose={() => setShowResearch(false)}
         />
       )}
+      {showGuide && (
+        <GuideOverlay onClose={() => setShowGuide(false)} />
+      )}
 
       <TopBar
         paused={paused}
@@ -457,13 +478,14 @@ function App() {
         onToggleStats={() => setShowStats(prev => !prev)}
         onToggleMarket={() => setShowMarket(prev => !prev)}
         onToggleResearch={() => setShowResearch(prev => !prev)}
+        onToggleGuide={() => setShowGuide(prev => !prev)}
         onSave={handleSave}
         onLoad={handleLoad}
         hasSave={hasSave}
       />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <BuildSidebar
+        {!placingCore && <BuildSidebar
           selectedBuilding={selectedBuilding}
           selectedModule={selectedModule}
           unlockedBuildings={unlockedBuildings}
@@ -471,7 +493,7 @@ function App() {
           setSelectedModule={setSelectedModule}
           canAffordBuilding={canAffordBuilding}
           getCostString={getCostString}
-        />
+        />}
 
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <canvas
@@ -480,17 +502,17 @@ function App() {
             onMouseLeave={() => { setHoverPos(h => ({ ...h, show: false })); if (engineRef.current) { engineRef.current.hoverGridX = -1; engineRef.current.hoverGridY = -1; } }}
             onClick={handleCanvasClick}
             onContextMenu={handleContextMenu}
-            style={{ cursor: 'crosshair', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', borderRadius: '8px' }}
+            style={{ cursor: placingCore ? 'pointer' : 'crosshair', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', borderRadius: '8px' }}
           />
         </div>
 
-        <ModuleSidebar
+        {!placingCore && <ModuleSidebar
           selectedModule={selectedModule}
           setSelectedModule={setSelectedModule}
           setSelectedBuilding={setSelectedBuilding}
           canAffordModule={canAffordModule}
           unlockedBuildings={unlockedBuildings}
-        />
+        />}
       </div>
     </div>
   );

@@ -139,6 +139,65 @@ export class Renderer {
 
     // Damage numbers
     this.drawDamageNumbers(engine.damageNumbers, zoom);
+
+    // Core placement overlay
+    if (engine.placingCore) {
+      this.drawCorePlacement(engine, zoom);
+    }
+  }
+
+  private drawCorePlacement(engine: GameEngine, zoom: number) {
+    const { ctx, canvas } = this;
+    const hx = engine.hoverGridX;
+    const hy = engine.hoverGridY;
+
+    // Darken the whole grid slightly
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Instruction text
+    ctx.fillStyle = '#00d2d3';
+    ctx.font = `bold ${Math.max(16, zoom * 0.6)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 6;
+    ctx.fillText('KERN PLATZIEREN', canvas.width / 2, zoom * 1.5);
+    ctx.font = `${Math.max(12, zoom * 0.4)}px monospace`;
+    ctx.fillStyle = '#ecf0f1';
+    ctx.fillText('Klicke auf das Feld, wo dein Kern stehen soll', canvas.width / 2, zoom * 2.5);
+    ctx.shadowBlur = 0;
+
+    // Hover indicator
+    if (hx >= 2 && hy >= 2 && hx < engine.grid.size - 2 && hy < engine.grid.size - 2) {
+      const isOre = engine.grid.tiles[hy][hx] === TileType.ORE_PATCH;
+      const px = hx * zoom;
+      const py = hy * zoom;
+
+      if (isOre) {
+        // Red indicator — can't place on ore
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.4)';
+        ctx.fillRect(px + 2, py + 2, zoom - 4, zoom - 4);
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 2, py + 2, zoom - 4, zoom - 4);
+      } else {
+        ctx.fillStyle = 'rgba(0, 210, 211, 0.4)';
+        ctx.fillRect(px + 2, py + 2, zoom - 4, zoom - 4);
+        ctx.strokeStyle = '#00d2d3';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 2, py + 2, zoom - 4, zoom - 4);
+
+        // Show a faint 3x3 clear zone indicator
+        ctx.fillStyle = 'rgba(0, 210, 211, 0.1)';
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            ctx.fillRect((hx + dx) * zoom + 1, (hy + dy) * zoom + 1, zoom - 2, zoom - 2);
+          }
+        }
+      }
+    }
   }
 
   private drawEnemies(enemies: Enemy[], zoom: number) {

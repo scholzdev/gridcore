@@ -14,7 +14,7 @@ export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStart
     alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', gap: '40px'
   }}>
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#00d2d3', marginBottom: '8px' }}>Rectangular</div>
+      <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#00d2d3', marginBottom: '8px' }}> Gridcore</div>
       <div style={{ fontSize: '16px', color: '#7f8c8d' }}>Verteidige deinen Kern</div>
     </div>
 
