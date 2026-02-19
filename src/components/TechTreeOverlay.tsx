@@ -19,7 +19,7 @@ export const TechTreeOverlay = ({ killPoints, unlockedBuildings, onUnlock, onClo
   }}>
     <div onClick={(e) => e.stopPropagation()} style={{
       backgroundColor: '#fff', borderRadius: '16px', padding: '30px',
-      maxWidth: '800px', width: '90%', maxHeight: '85vh', overflowY: 'auto',
+      maxWidth: '1100px', width: '95%', maxHeight: '90vh', overflowY: 'auto',
       boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>

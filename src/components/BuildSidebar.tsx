@@ -23,8 +23,10 @@ export const BuildSidebar = ({
       <h3 style={{ margin: '0', fontSize: '14px', color: '#7f8c8d' }}>KONSTRUKTION</h3>
       <BuildGroup label="Infrastruktur">
         <BuildBtn type={TileType.SOLAR_PANEL} selected={sel} set={set} label="Solarfeld" cost={getCostString(TileType.SOLAR_PANEL)} color="#f1c40f" affordable={canAffordBuilding(TileType.SOLAR_PANEL)} />
-        <BuildBtn type={TileType.MINER} selected={sel} set={set} label="Minenbohrer" cost={getCostString(TileType.MINER)} color="#9b59b6" affordable={canAffordBuilding(TileType.MINER)} />
+        <BuildBtn type={TileType.MINER} selected={sel} set={set} label="Schrottbohrer" cost={getCostString(TileType.MINER)} color="#9b59b6" affordable={canAffordBuilding(TileType.MINER)} />
         <BuildBtn type={TileType.WALL} selected={sel} set={set} label="Schwere Mauer" cost={getCostString(TileType.WALL)} color="#576574" affordable={canAffordBuilding(TileType.WALL)} />
+        <BuildBtn type={TileType.STEEL_SMELTER} selected={sel} set={set} label="Stahlschmelze" cost={getCostString(TileType.STEEL_SMELTER)} color="#e17055" affordable={canAffordBuilding(TileType.STEEL_SMELTER)} locked={!unlockedBuildings.has(TileType.STEEL_SMELTER)} />
+        <BuildBtn type={TileType.CRYSTAL_DRILL} selected={sel} set={set} label="Kristallbohrer" cost={getCostString(TileType.CRYSTAL_DRILL)} color="#1abc9c" affordable={canAffordBuilding(TileType.CRYSTAL_DRILL)} locked={!unlockedBuildings.has(TileType.CRYSTAL_DRILL)} />
         <BuildBtn type={TileType.REPAIR_BAY} selected={sel} set={set} label="Reparaturbucht" cost={getCostString(TileType.REPAIR_BAY)} color="#e056a0" affordable={canAffordBuilding(TileType.REPAIR_BAY)} locked={!unlockedBuildings.has(TileType.REPAIR_BAY)} />
       </BuildGroup>
       <BuildGroup label="Verteidigung">

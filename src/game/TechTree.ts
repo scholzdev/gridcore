@@ -15,11 +15,13 @@ export const TECH_TREE: TechNode[] = [
   { id: 'repair', name: 'Reparaturbucht', unlocks: TileType.REPAIR_BAY, killCost: 5, tier: 1, description: 'Repariert Gebäude im Bereich' },
   { id: 'emp', name: 'EMP-Feld', unlocks: TileType.SLOW_FIELD, killCost: 5, tier: 1, description: 'Verlangsamt Gegner' },
   { id: 'mine', name: 'Minenfeld', unlocks: TileType.MINEFIELD, killCost: 5, tier: 1, description: 'Explodiert bei Kontakt' },
+  { id: 'smelter', name: 'Stahlschmelze', unlocks: TileType.STEEL_SMELTER, killCost: 5, tier: 1, description: 'Erz → Stahl direkt' },
   // Tier 2 - 15 Kills
   { id: 'storm', name: 'Sturmgeschütz', unlocks: TileType.HEAVY_TURRET, killCost: 15, tier: 2, description: 'Hoher Schaden, große Reichweite' },
   { id: 'tesla', name: 'Teslaspule', unlocks: TileType.TESLA_COIL, killCost: 15, tier: 2, description: 'Trifft 3+ Ziele gleichzeitig' },
   { id: 'shield', name: 'Schildgenerator', unlocks: TileType.SHIELD_GENERATOR, killCost: 15, tier: 2, description: 'Schirmt Gebäude ab' },
   { id: 'efab', name: 'E-Fabrik', unlocks: TileType.FABRICATOR, killCost: 15, tier: 2, description: 'Schrott+Energie → E-Komp' },
+  { id: 'crystal', name: 'Kristallbohrer', unlocks: TileType.CRYSTAL_DRILL, killCost: 15, tier: 2, description: 'Erz → E-Komp direkt' },
   // Tier 3 - 30 Kills
   { id: 'radar', name: 'Radarstation', unlocks: TileType.RADAR_STATION, killCost: 30, tier: 3, description: 'Erhöht Geschützreichweite' },
   { id: 'recycler', name: 'Recycler', unlocks: TileType.RECYCLER, killCost: 30, tier: 3, description: 'Stahl+E-Komp aus Schrott' },

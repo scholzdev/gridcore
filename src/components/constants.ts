@@ -1,8 +1,33 @@
 import { TileType } from '../game/Grid';
 
+export const BUILDING_NAMES: Record<number, string> = {
+  [TileType.CORE]: 'Kern',
+  [TileType.SOLAR_PANEL]: 'Solarfeld',
+  [TileType.MINER]: 'Schrottbohrer',
+  [TileType.WALL]: 'Schwere Mauer',
+  [TileType.TURRET]: 'Wächtergeschütz',
+  [TileType.HEAVY_TURRET]: 'Sturmgeschütz',
+  [TileType.TESLA_COIL]: 'Teslaspule',
+  [TileType.PLASMA_CANNON]: 'Plasmakanone',
+  [TileType.SLOW_FIELD]: 'EMP-Feld',
+  [TileType.SHIELD_GENERATOR]: 'Schildgenerator',
+  [TileType.RADAR_STATION]: 'Radarstation',
+  [TileType.REPAIR_BAY]: 'Reparaturbucht',
+  [TileType.FOUNDRY]: 'Gießerei',
+  [TileType.FABRICATOR]: 'E-Fabrik',
+  [TileType.RECYCLER]: 'Recycler',
+  [TileType.LAB]: 'Forschungslabor',
+  [TileType.DATA_VAULT]: 'Datentresor',
+  [TileType.LASER_TURRET]: 'Laserturm',
+  [TileType.MINEFIELD]: 'Minenfeld',
+  [TileType.DRONE_HANGAR]: 'Drohnenhangar',
+  [TileType.CRYSTAL_DRILL]: 'Kristallbohrer',
+  [TileType.STEEL_SMELTER]: 'Stahlschmelze',
+};
+
 export const BUILDING_DESC: Record<number, string> = {
   [TileType.SOLAR_PANEL]: 'Erzeugt Energie. Überall platzierbar.',
-  [TileType.MINER]: 'Baut Schrott ab. Auf Erzvorkommen platzieren.',
+  [TileType.MINER]: 'Baut Schrott aus Erz ab. Auf Erzvorkommen platzieren.',
   [TileType.WALL]: 'Hohe HP-Barriere. Blockiert Gegner.',
   [TileType.TURRET]: 'Schießt auf nahe Gegner. Reichweite 6.',
   [TileType.HEAVY_TURRET]: 'Hoher Schaden, große Reichweite. Reichweite 12.',
@@ -20,6 +45,8 @@ export const BUILDING_DESC: Record<number, string> = {
   [TileType.LASER_TURRET]: 'Kontinuierlicher Laserstrahl. Schaden steigt mit Fokuszeit bis 3×.',
   [TileType.MINEFIELD]: 'Explodiert bei Feindkontakt. Flächenschaden. Einmalverwendung.',
   [TileType.DRONE_HANGAR]: 'Spawnt autonome Drohnen die Gegner verfolgen. 2+Level Drohnen.',
+  [TileType.CRYSTAL_DRILL]: 'Baut E-Komp direkt aus Erz ab. Auf Erzvorkommen platzieren. Verbraucht Energie.',
+  [TileType.STEEL_SMELTER]: 'Schmilzt Stahl direkt aus Erz. Auf Erzvorkommen platzieren. Verbraucht Energie.',
 };
 
 export const BUILDING_COLORS: Record<number, string> = {
@@ -32,6 +59,8 @@ export const BUILDING_COLORS: Record<number, string> = {
   [TileType.LASER_TURRET]: '#e84393',
   [TileType.MINEFIELD]: '#d63031',
   [TileType.DRONE_HANGAR]: '#0984e3',
+  [TileType.CRYSTAL_DRILL]: '#1abc9c',
+  [TileType.STEEL_SMELTER]: '#e17055',
 };
 
 export const scaleVals = (base: number) =>

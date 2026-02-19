@@ -22,6 +22,8 @@ export enum TileType {
   LASER_TURRET = 19,
   MINEFIELD = 20,
   DRONE_HANGAR = 21,
+  CRYSTAL_DRILL = 22,
+  STEEL_SMELTER = 23,
 }
 
 export enum ModuleType {
@@ -42,7 +44,8 @@ export interface ModuleDef {
 }
 
 const TURRETS = [TileType.TURRET, TileType.HEAVY_TURRET, TileType.TESLA_COIL, TileType.PLASMA_CANNON, TileType.LASER_TURRET, TileType.DRONE_HANGAR];
-const PRODUCERS = [TileType.SOLAR_PANEL, TileType.MINER, TileType.FOUNDRY, TileType.FABRICATOR, TileType.LAB, TileType.RECYCLER];
+const PRODUCERS = [TileType.SOLAR_PANEL, TileType.MINER, TileType.FOUNDRY, TileType.FABRICATOR, TileType.LAB, TileType.RECYCLER, TileType.CRYSTAL_DRILL, TileType.STEEL_SMELTER];
+export const ORE_BUILDINGS = [TileType.MINER, TileType.CRYSTAL_DRILL, TileType.STEEL_SMELTER];
 
 export const MODULE_DEFS: Record<number, ModuleDef> = {
   [ModuleType.ATTACK_SPEED]: { name: 'Schnellfeuer', description: '+30% Feuerrate', color: '#e74c3c', cost: { steel: 60, electronics: 40 }, appliesTo: TURRETS },
@@ -85,6 +88,8 @@ export const BUILDING_STATS: Record<number, Partial<Building>> = {
   [TileType.LASER_TURRET]: { health: 1500, maxHealth: 1500, range: 8, damage: 20, cost: { steel: 200, electronics: 150 }, costIncrease: { steel: 100, electronics: 75 }, consumes: { energy: 30 } },
   [TileType.MINEFIELD]: { health: 200, maxHealth: 200, damage: 250, cost: { scrap: 60, steel: 30 }, costIncrease: { scrap: 20, steel: 10 } },
   [TileType.DRONE_HANGAR]: { health: 2000, maxHealth: 2000, range: 10, damage: 25, cost: { steel: 250, electronics: 200, data: 50 }, costIncrease: { steel: 125, electronics: 100, data: 25 }, consumes: { energy: 35 } },
+  [TileType.CRYSTAL_DRILL]: { health: 600, maxHealth: 600, cost: { scrap: 80, steel: 40 }, costIncrease: { scrap: 30, steel: 15 }, consumes: { energy: 15 }, income: { electronics: 8 } },
+  [TileType.STEEL_SMELTER]: { health: 600, maxHealth: 600, cost: { scrap: 60, energy: 20 }, costIncrease: { scrap: 20, energy: 10 }, consumes: { energy: 10 }, income: { steel: 12 } },
 };
 
 export class GameGrid {
@@ -122,7 +127,7 @@ export class GameGrid {
     if (current === TileType.CORE) return false;
 
     // Regeln prüfen
-    if (type === TileType.MINER) { if (current !== TileType.ORE_PATCH) return false; }
+    if (type === TileType.MINER || type === TileType.CRYSTAL_DRILL || type === TileType.STEEL_SMELTER) { if (current !== TileType.ORE_PATCH) return false; }
     else { if (current !== TileType.EMPTY) return false; }
 
     this.tiles[y][x] = type;
@@ -169,7 +174,7 @@ export class GameGrid {
     const type = this.tiles[y][x];
     if (type === TileType.EMPTY || type === TileType.ORE_PATCH || type === TileType.CORE) return 0;
     // Miner steht auf Ore Patch -> zurück zu Ore Patch
-    this.tiles[y][x] = (type === TileType.MINER) ? TileType.ORE_PATCH : TileType.EMPTY;
+    this.tiles[y][x] = (type === TileType.MINER || type === TileType.CRYSTAL_DRILL || type === TileType.STEEL_SMELTER) ? TileType.ORE_PATCH : TileType.EMPTY;
     const level = this.levels[y][x];
     this.levels[y][x] = 0;
     this.healths[y][x] = 0;

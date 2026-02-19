@@ -25,6 +25,8 @@ const TILE_COLORS: Record<number, string> = {
   [TileType.LASER_TURRET]: '#e84393',
   [TileType.MINEFIELD]: '#d63031',
   [TileType.DRONE_HANGAR]: '#0984e3',
+  [TileType.CRYSTAL_DRILL]: '#1abc9c',
+  [TileType.STEEL_SMELTER]: '#e17055',
 };
 
 export class Renderer {
@@ -60,7 +62,7 @@ export class Renderer {
         const px = x * zoom;
         const py = y * zoom;
 
-        if (type === TileType.ORE_PATCH || type === TileType.MINER) {
+        if (type === TileType.ORE_PATCH || type === TileType.MINER || type === TileType.CRYSTAL_DRILL || type === TileType.STEEL_SMELTER) {
           ctx.fillStyle = TILE_COLORS[TileType.ORE_PATCH];
           ctx.fillRect(px + 2, py + 2, zoom - 4, zoom - 4);
         }

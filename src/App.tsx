@@ -11,6 +11,8 @@ import { ModuleSidebar } from './components/ModuleSidebar';
 import { TechTreeOverlay } from './components/TechTreeOverlay';
 import { Tooltip } from './components/Tooltip';
 
+import { BUILDING_NAMES } from './components/constants';
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
@@ -168,7 +170,7 @@ function App() {
         } : undefined;
         const scaledDamage = stats.damage ? Math.floor(stats.damage * mult * 10) / 10 : undefined;
         setHoveredData({
-          name: TileType[type].replace('_', ' '),
+          name: BUILDING_NAMES[type] || TileType[type],
           stats: { ...stats, income: scaledIncome, damage: scaledDamage },
           hp: engineRef.current.grid.healths[worldY][worldX],
           shield: engineRef.current.grid.shields[worldY][worldX],

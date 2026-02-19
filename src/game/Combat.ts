@@ -308,7 +308,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
         e.lastHit = timestamp;
         if (engine.grid.healths[ty][tx] <= 0) {
           if (tile === TileType.CORE) engine.gameOver = true;
-          engine.grid.tiles[ty][tx] = (tile === TileType.MINER) ? TileType.ORE_PATCH : TileType.EMPTY;
+          engine.grid.tiles[ty][tx] = (tile === TileType.MINER || tile === TileType.CRYSTAL_DRILL || tile === TileType.STEEL_SMELTER) ? TileType.ORE_PATCH : TileType.EMPTY;
           engine.grid.levels[ty][tx] = 0;
           engine.grid.shields[ty][tx] = 0;
         }
