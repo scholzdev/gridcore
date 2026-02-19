@@ -25,6 +25,40 @@ export interface Enemy { id: string; x: number; y: number; health: number; maxHe
 export interface Projectile { id: string; x: number; y: number; targetX: number; targetY: number; speed: number; color: string; damage: number; targetId: string; splash?: number; }
 export interface Particle { x: number; y: number; vx: number; vy: number; life: number; color: string; }
 
+// TECH TREE
+export interface TechNode {
+  id: string;
+  name: string;
+  unlocks: TileType;
+  killCost: number;
+  tier: number;
+  description: string;
+}
+
+export const TECH_TREE: TechNode[] = [
+  // Tier 1 - 5 Kills
+  { id: 'foundry', name: 'Gießerei', unlocks: TileType.FOUNDRY, killCost: 5, tier: 1, description: 'Schrott+Energie → Stahl' },
+  { id: 'repair', name: 'Reparaturbucht', unlocks: TileType.REPAIR_BAY, killCost: 5, tier: 1, description: 'Repariert Gebäude im Bereich' },
+  { id: 'emp', name: 'EMP-Feld', unlocks: TileType.SLOW_FIELD, killCost: 5, tier: 1, description: 'Verlangsamt Gegner' },
+  // Tier 2 - 15 Kills
+  { id: 'storm', name: 'Sturmgeschütz', unlocks: TileType.HEAVY_TURRET, killCost: 15, tier: 2, description: 'Hoher Schaden, große Reichweite' },
+  { id: 'tesla', name: 'Teslaspule', unlocks: TileType.TESLA_COIL, killCost: 15, tier: 2, description: 'Trifft 3+ Ziele gleichzeitig' },
+  { id: 'shield', name: 'Schildgenerator', unlocks: TileType.SHIELD_GENERATOR, killCost: 15, tier: 2, description: 'Schirmt Gebäude ab' },
+  { id: 'efab', name: 'E-Fabrik', unlocks: TileType.FABRICATOR, killCost: 15, tier: 2, description: 'Schrott+Energie → E-Komp' },
+  // Tier 3 - 30 Kills
+  { id: 'radar', name: 'Radarstation', unlocks: TileType.RADAR_STATION, killCost: 30, tier: 3, description: 'Erhöht Geschützreichweite' },
+  { id: 'recycler', name: 'Recycler', unlocks: TileType.RECYCLER, killCost: 30, tier: 3, description: 'Stahl+E-Komp aus Schrott' },
+  { id: 'lab', name: 'Forschungslabor', unlocks: TileType.LAB, killCost: 30, tier: 3, description: 'Energie+E-Komp → Daten' },
+  // Tier 4 - 50 Kills
+  { id: 'plasma', name: 'Plasmakanone', unlocks: TileType.PLASMA_CANNON, killCost: 50, tier: 4, description: 'Massiver Flächenschaden' },
+  { id: 'vault', name: 'Datentresor', unlocks: TileType.DATA_VAULT, killCost: 50, tier: 4, description: '+15% Geschützschaden global' },
+];
+
+// Gebäude die von Anfang an verfügbar sind
+export const STARTER_BUILDINGS: TileType[] = [
+  TileType.SOLAR_PANEL, TileType.MINER, TileType.WALL, TileType.TURRET
+];
+
 // FESTE FARB-PALETTE
 const TILE_COLORS: Record<number, string> = {
   [TileType.CORE]: '#00d2d3',       // Cyan
@@ -70,6 +104,8 @@ export class GameEngine {
   buildingsPlaced: number = 0;
   difficulty: Difficulty = 'leicht';
   diffConfig: DifficultyConfig = DIFFICULTY_PRESETS['leicht'];
+  killPoints: number = 0;
+  unlockedBuildings: Set<TileType> = new Set(STARTER_BUILDINGS);
 
   purchasedCounts: Record<number, number> = {};
   canvas: HTMLCanvasElement;
@@ -90,6 +126,14 @@ export class GameEngine {
     this.diffConfig = DIFFICULTY_PRESETS[d];
   }
 
+  unlockBuilding(node: TechNode): boolean {
+    if (this.killPoints < node.killCost) return false;
+    if (this.unlockedBuildings.has(node.unlocks)) return false;
+    this.killPoints -= node.killCost;
+    this.unlockedBuildings.add(node.unlocks);
+    return true;
+  }
+
   restart() {
     this.grid = new GameGrid(30);
     this.resources = new ResourceManager();
@@ -107,6 +151,8 @@ export class GameEngine {
     this.netIncome = { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
 
     this.buildingsPlaced = 0;
+    this.killPoints = 0;
+    this.unlockedBuildings = new Set(STARTER_BUILDINGS);
     Object.values(TileType).forEach(v => { if(typeof v === 'number') this.purchasedCounts[v] = 0; });
   }
 
@@ -447,6 +493,7 @@ export class GameEngine {
                 toRemove.forEach(id => {
                     this.enemies = this.enemies.filter(e => e.id !== id);
                     this.enemiesKilled++;
+                    this.killPoints++;
                     this.resources.add({ scrap: 30 });
                 });
                 // Splash particles
@@ -457,7 +504,7 @@ export class GameEngine {
             } else {
                 // Normal single-target hit
                 const target = this.enemies.find(e => e.id === p.targetId);
-                if (target) { target.health -= p.damage; if (target.health <= 0) { this.enemies = this.enemies.filter(e => e.id !== target.id); this.enemiesKilled++; this.resources.add({ scrap: 30 }); } }
+                if (target) { target.health -= p.damage; if (target.health <= 0) { this.enemies = this.enemies.filter(e => e.id !== target.id); this.enemiesKilled++; this.killPoints++; this.resources.add({ scrap: 30 }); } }
             }
             return false;
         }

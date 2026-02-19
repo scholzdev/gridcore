@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { GameEngine, DIFFICULTY_PRESETS } from './game/Engine';
-import type { Difficulty } from './game/Engine';
+import { GameEngine, DIFFICULTY_PRESETS, TECH_TREE, STARTER_BUILDINGS } from './game/Engine';
+import type { Difficulty, TechNode } from './game/Engine';
 import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS } from './game/Grid';
 
 function App() {
@@ -21,6 +21,9 @@ function App() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('leicht');
   const [gameStarted, setGameStarted] = useState(false);
+  const [showTechTree, setShowTechTree] = useState(false);
+  const [killPoints, setKillPoints] = useState(0);
+  const [unlockedBuildings, setUnlockedBuildings] = useState<Set<TileType>>(new Set(STARTER_BUILDINGS));
 
   useEffect(() => {
     if (!gameStarted || !canvasRef.current || engineRef.current) return;
@@ -44,6 +47,8 @@ function App() {
       });
       setNetIncome({ ...engineRef.current.netIncome });
       setIsGameOver(engineRef.current.gameOver);
+      setKillPoints(engineRef.current.killPoints);
+      setUnlockedBuildings(new Set(engineRef.current.unlockedBuildings));
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -63,6 +68,9 @@ function App() {
           handleRestart();
         }
       }
+      if (e.key === 't' || e.key === 'T') {
+        setShowTechTree(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -78,8 +86,19 @@ function App() {
     setPaused(false);
     setIsGameOver(false);
     setGameStarted(false);
+    setShowTechTree(false);
+    setKillPoints(0);
+    setUnlockedBuildings(new Set(STARTER_BUILDINGS));
     setSelectedBuilding(TileType.SOLAR_PANEL);
     setSelectedModule(ModuleType.NONE);
+  };
+
+  const handleUnlock = (node: TechNode) => {
+    if (!engineRef.current) return;
+    if (engineRef.current.unlockBuilding(node)) {
+      setKillPoints(engineRef.current.killPoints);
+      setUnlockedBuildings(new Set(engineRef.current.unlockedBuildings));
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -321,6 +340,78 @@ function App() {
         </div>
       )}
 
+      {/* TECH TREE OVERLAY */}
+      {showTechTree && (
+        <div onClick={() => setShowTechTree(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 900,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            backgroundColor: '#fff', borderRadius: '16px', padding: '30px',
+            maxWidth: '800px', width: '90%', maxHeight: '85vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, fontSize: '22px', color: '#2d3436' }}>🔬 Techbaum</h2>
+              <button onClick={() => setShowTechTree(false)} style={{
+                background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#7f8c8d'
+              }}>✕</button>
+            </div>
+            {[1, 2, 3, 4].map(tier => {
+              const tierNodes = TECH_TREE.filter(n => n.tier === tier);
+              const tierLabels = ['', 'Basis', 'Erweitert', 'Fortgeschritten', 'Elite'];
+              const tierColors = ['', '#27ae60', '#f39c12', '#e74c3c', '#8e44ad'];
+              return (
+                <div key={tier} style={{ marginBottom: '16px' }}>
+                  <div style={{
+                    fontSize: '11px', fontWeight: 'bold', color: tierColors[tier],
+                    textTransform: 'uppercase', marginBottom: '8px',
+                    borderBottom: `2px solid ${tierColors[tier]}30`, paddingBottom: '4px'
+                  }}>
+                    Tier {tier} — {tierLabels[tier]} · {tierNodes[0]?.killCost} KP pro Gebäude
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tierNodes.length}, 1fr)`, gap: '8px', alignItems: 'stretch' }}>
+                    {tierNodes.map(node => {
+                      const isUnlocked = unlockedBuildings.has(node.unlocks);
+                      const canAfford = killPoints >= node.killCost;
+                      const bColor = BUILDING_COLORS[node.unlocks] || '#7f8c8d';
+                      const bStats = BUILDING_STATS[node.unlocks];
+                      const costStr = (() => {
+                        const c = bStats?.cost;
+                        if (!c) return '';
+                        const p: string[] = [];
+                        if (c.scrap) p.push(`${c.scrap} Schrott`);
+                        if (c.energy) p.push(`${c.energy} Energie`);
+                        if (c.steel) p.push(`${c.steel} Stahl`);
+                        if (c.electronics) p.push(`${c.electronics} E-Komp`);
+                        if (c.data) p.push(`${c.data} Daten`);
+                        return p.join(' / ');
+                      })();
+                      return (
+                        <TechNodeCard key={node.id} node={node} isUnlocked={isUnlocked} canAfford={canAfford}
+                          bColor={bColor} bStats={bStats} costStr={costStr}
+                          onUnlock={() => handleUnlock(node)} />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            {/* KP centered at bottom */}
+            <div style={{
+              textAlign: 'center', marginTop: '12px', paddingTop: '12px',
+              borderTop: '1px solid #dfe4ea'
+            }}>
+              <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#8e44ad' }}>{killPoints} KP</span>
+              <div style={{ fontSize: '11px', color: '#b2bec3', marginTop: '4px' }}>
+                Drücke T zum Schließen · Besiege Gegner für KP
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOP BAR - Resources & Status */}
       <div style={{ 
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -342,6 +433,10 @@ function App() {
         }}>{DIFFICULTY_PRESETS[difficulty].label}</div>
         <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatTime(gameStats.time)}</div>
         <div style={{ color: '#e84118', fontWeight: 'bold', fontSize: '14px' }}>BESIEGT: {gameStats.killed}</div>
+        <button onClick={() => setShowTechTree(prev => !prev)} style={{
+          padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+          backgroundColor: showTechTree ? '#8e44ad' : '#9b59b6', color: '#fff', border: 'none'
+        }}>🔬 TECHBAUM ({killPoints} KP)</button>
         <div style={{ fontSize: '14px' }}>KERN: <span style={{ color: coreHealth.current < coreHealth.max * 0.3 ? '#e74c3c' : '#2d3436', fontWeight: 'bold' }}>{Math.max(0, Math.floor(coreHealth.current))}</span></div>
         <div style={{ width: '1px', height: '20px', backgroundColor: '#dfe4ea' }} />
         <div style={{ fontSize: '14px' }}>Energie: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{Math.floor(resources.energy)}</span> <span style={{ fontSize: '11px', color: netIncome.energy >= 0 ? '#27ae60' : '#e74c3c' }}>{netIncome.energy >= 0 ? '+' : ''}{netIncome.energy}/s</span></div>
@@ -361,27 +456,27 @@ function App() {
             <BuildBtn type={TileType.SOLAR_PANEL} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Solarfeld" cost={getCostString(TileType.SOLAR_PANEL)} color="#f1c40f" affordable={canAffordBuilding(TileType.SOLAR_PANEL)} />
             <BuildBtn type={TileType.MINER} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Minenbohrer" cost={getCostString(TileType.MINER)} color="#9b59b6" affordable={canAffordBuilding(TileType.MINER)} />
             <BuildBtn type={TileType.WALL} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Schwere Mauer" cost={getCostString(TileType.WALL)} color="#576574" affordable={canAffordBuilding(TileType.WALL)} />
-            <BuildBtn type={TileType.REPAIR_BAY} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Reparaturbucht" cost={getCostString(TileType.REPAIR_BAY)} color="#e056a0" affordable={canAffordBuilding(TileType.REPAIR_BAY)} />
+            <BuildBtn type={TileType.REPAIR_BAY} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Reparaturbucht" cost={getCostString(TileType.REPAIR_BAY)} color="#e056a0" affordable={canAffordBuilding(TileType.REPAIR_BAY)} locked={!unlockedBuildings.has(TileType.REPAIR_BAY)} />
           </BuildGroup>
           <BuildGroup label="Verteidigung">
             <BuildBtn type={TileType.TURRET} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Wächtergeschütz" cost={getCostString(TileType.TURRET)} color="#e67e22" affordable={canAffordBuilding(TileType.TURRET)} />
-            <BuildBtn type={TileType.HEAVY_TURRET} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Sturmgeschütz" cost={getCostString(TileType.HEAVY_TURRET)} color="#c0392b" affordable={canAffordBuilding(TileType.HEAVY_TURRET)} />
-            <BuildBtn type={TileType.TESLA_COIL} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Teslaspule" cost={getCostString(TileType.TESLA_COIL)} color="#6c5ce7" affordable={canAffordBuilding(TileType.TESLA_COIL)} />
-            <BuildBtn type={TileType.PLASMA_CANNON} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Plasmakanone" cost={getCostString(TileType.PLASMA_CANNON)} color="#fd79a8" affordable={canAffordBuilding(TileType.PLASMA_CANNON)} />
+            <BuildBtn type={TileType.HEAVY_TURRET} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Sturmgeschütz" cost={getCostString(TileType.HEAVY_TURRET)} color="#c0392b" affordable={canAffordBuilding(TileType.HEAVY_TURRET)} locked={!unlockedBuildings.has(TileType.HEAVY_TURRET)} />
+            <BuildBtn type={TileType.TESLA_COIL} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Teslaspule" cost={getCostString(TileType.TESLA_COIL)} color="#6c5ce7" affordable={canAffordBuilding(TileType.TESLA_COIL)} locked={!unlockedBuildings.has(TileType.TESLA_COIL)} />
+            <BuildBtn type={TileType.PLASMA_CANNON} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Plasmakanone" cost={getCostString(TileType.PLASMA_CANNON)} color="#fd79a8" affordable={canAffordBuilding(TileType.PLASMA_CANNON)} locked={!unlockedBuildings.has(TileType.PLASMA_CANNON)} />
           </BuildGroup>
           <BuildGroup label="Unterstützung">
-            <BuildBtn type={TileType.SLOW_FIELD} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="EMP-Feld" cost={getCostString(TileType.SLOW_FIELD)} color="#a29bfe" affordable={canAffordBuilding(TileType.SLOW_FIELD)} />
-            <BuildBtn type={TileType.SHIELD_GENERATOR} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Schildgenerator" cost={getCostString(TileType.SHIELD_GENERATOR)} color="#74b9ff" affordable={canAffordBuilding(TileType.SHIELD_GENERATOR)} />
-            <BuildBtn type={TileType.RADAR_STATION} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Radarstation" cost={getCostString(TileType.RADAR_STATION)} color="#fdcb6e" affordable={canAffordBuilding(TileType.RADAR_STATION)} />
+            <BuildBtn type={TileType.SLOW_FIELD} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="EMP-Feld" cost={getCostString(TileType.SLOW_FIELD)} color="#a29bfe" affordable={canAffordBuilding(TileType.SLOW_FIELD)} locked={!unlockedBuildings.has(TileType.SLOW_FIELD)} />
+            <BuildBtn type={TileType.SHIELD_GENERATOR} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Schildgenerator" cost={getCostString(TileType.SHIELD_GENERATOR)} color="#74b9ff" affordable={canAffordBuilding(TileType.SHIELD_GENERATOR)} locked={!unlockedBuildings.has(TileType.SHIELD_GENERATOR)} />
+            <BuildBtn type={TileType.RADAR_STATION} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Radarstation" cost={getCostString(TileType.RADAR_STATION)} color="#fdcb6e" affordable={canAffordBuilding(TileType.RADAR_STATION)} locked={!unlockedBuildings.has(TileType.RADAR_STATION)} />
           </BuildGroup>
           <BuildGroup label="Verarbeitung">
-            <BuildBtn type={TileType.FOUNDRY} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Gießerei" cost={getCostString(TileType.FOUNDRY)} color="#ff9f43" affordable={canAffordBuilding(TileType.FOUNDRY)} />
-            <BuildBtn type={TileType.FABRICATOR} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="E-Fabrik" cost={getCostString(TileType.FABRICATOR)} color="#1dd1a1" affordable={canAffordBuilding(TileType.FABRICATOR)} />
-            <BuildBtn type={TileType.RECYCLER} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Recycler" cost={getCostString(TileType.RECYCLER)} color="#55efc4" affordable={canAffordBuilding(TileType.RECYCLER)} />
+            <BuildBtn type={TileType.FOUNDRY} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Gießerei" cost={getCostString(TileType.FOUNDRY)} color="#ff9f43" affordable={canAffordBuilding(TileType.FOUNDRY)} locked={!unlockedBuildings.has(TileType.FOUNDRY)} />
+            <BuildBtn type={TileType.FABRICATOR} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="E-Fabrik" cost={getCostString(TileType.FABRICATOR)} color="#1dd1a1" affordable={canAffordBuilding(TileType.FABRICATOR)} locked={!unlockedBuildings.has(TileType.FABRICATOR)} />
+            <BuildBtn type={TileType.RECYCLER} selected={selectedModule === ModuleType.NONE ? selectedBuilding : -1} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Recycler" cost={getCostString(TileType.RECYCLER)} color="#55efc4" affordable={canAffordBuilding(TileType.RECYCLER)} locked={!unlockedBuildings.has(TileType.RECYCLER)} />
           </BuildGroup>
           <BuildGroup label="Forschung">
-            <BuildBtn type={TileType.LAB} selected={selectedBuilding} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Forschungslabor" cost={getCostString(TileType.LAB)} color="#54a0ff" affordable={canAffordBuilding(TileType.LAB)} />
-            <BuildBtn type={TileType.DATA_VAULT} selected={selectedBuilding} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Datentresor" cost={getCostString(TileType.DATA_VAULT)} color="#00cec9" affordable={canAffordBuilding(TileType.DATA_VAULT)} />
+            <BuildBtn type={TileType.LAB} selected={selectedBuilding} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Forschungslabor" cost={getCostString(TileType.LAB)} color="#54a0ff" affordable={canAffordBuilding(TileType.LAB)} locked={!unlockedBuildings.has(TileType.LAB)} />
+            <BuildBtn type={TileType.DATA_VAULT} selected={selectedBuilding} set={(t: TileType) => { setSelectedBuilding(t); setSelectedModule(ModuleType.NONE); }} label="Datentresor" cost={getCostString(TileType.DATA_VAULT)} color="#00cec9" affordable={canAffordBuilding(TileType.DATA_VAULT)} locked={!unlockedBuildings.has(TileType.DATA_VAULT)} />
           </BuildGroup>
         </div>
 
@@ -438,6 +533,108 @@ const BuildGroup = ({ label, children }: any) => (
   </div>
 );
 
+const TechNodeCard = ({ node, isUnlocked, canAfford, bColor, bStats, costStr, onUnlock }: any) => {
+  const [hover, setHover] = React.useState(false);
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+  const [shift, setShift] = React.useState(false);
+  const desc = BUILDING_DESC[node.unlocks] || node.description;
+
+  React.useEffect(() => {
+    const down = (e: KeyboardEvent) => { if (e.key === 'Shift') setShift(true); };
+    const up = (e: KeyboardEvent) => { if (e.key === 'Shift') setShift(false); };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
+
+  const incParts: string[] = [];
+  if (bStats?.income?.energy) incParts.push(`+${bStats.income.energy} Energie`);
+  if (bStats?.income?.scrap) incParts.push(`+${bStats.income.scrap} Schrott`);
+  if (bStats?.income?.steel) incParts.push(`+${bStats.income.steel} Stahl`);
+  if (bStats?.income?.electronics) incParts.push(`+${bStats.income.electronics} E-Komp`);
+  if (bStats?.income?.data) incParts.push(`+${bStats.income.data} Daten`);
+  const conParts: string[] = [];
+  if (bStats?.consumes?.energy) conParts.push(`${bStats.consumes.energy} Energie`);
+  if (bStats?.consumes?.scrap) conParts.push(`${bStats.consumes.scrap} Schrott`);
+  if (bStats?.consumes?.electronics) conParts.push(`${bStats.consumes.electronics} E-Komp`);
+  if (bStats?.consumes?.data) conParts.push(`${bStats.consumes.data} Daten`);
+
+  const showDetails = hover && shift;
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+      style={{
+        padding: '10px', borderRadius: '8px',
+        border: isUnlocked ? `2px solid ${bColor}` : canAfford ? '2px solid #8e44ad' : '1px solid #dfe4ea',
+        backgroundColor: isUnlocked ? `${bColor}10` : canAfford ? '#fff' : '#f8f9fa',
+        display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'default'
+      }}
+    >
+      {/* Name + cost — like sidebar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: bColor, flexShrink: 0 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+          <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#2d3436' }}>{node.name}</span>
+          <span style={{ fontSize: '10px', opacity: 0.6 }}>{costStr}</span>
+        </div>
+        {isUnlocked && <span style={{ fontSize: '12px', flexShrink: 0 }}>✅</span>}
+        {!isUnlocked && <span style={{ fontSize: '12px', flexShrink: 0 }}>🔒</span>}
+      </div>
+      {/* Unlock button */}
+      {!isUnlocked && (
+        <button onClick={onUnlock} disabled={!canAfford} style={{
+          marginTop: 'auto', padding: '5px 10px', borderRadius: '6px', fontSize: '11px',
+          fontWeight: 'bold', fontFamily: 'monospace', cursor: canAfford ? 'pointer' : 'default',
+          backgroundColor: canAfford ? '#8e44ad' : '#dfe4ea',
+          color: canAfford ? '#fff' : '#7f8c8d',
+          border: 'none', transition: 'all 0.15s', width: '100%'
+        }}>
+          {canAfford ? `Freischalten (${node.killCost} KP)` : `${node.killCost} KP benötigt`}
+        </button>
+      )}
+      {/* Shift-hover tooltip — like sidebar */}
+      {hover && (
+        <div style={{
+          position: 'fixed', left: mousePos.x + 15, top: mousePos.y - 10, zIndex: 1100,
+          backgroundColor: '#ffffff', border: '2px solid #2d3436',
+          padding: '10px 12px', borderRadius: '8px', width: showDetails ? 260 : 200,
+          boxShadow: '0 4px 15px rgba(0,0,0,0.25)', pointerEvents: 'none'
+        }}>
+          <div style={{ fontWeight: 'bold', fontSize: '13px', color: bColor, marginBottom: '6px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>
+            {node.name} {showDetails && <span style={{ fontSize: '10px', color: '#7f8c8d' }}>Lv 1-5</span>}
+          </div>
+          <div style={{ fontSize: '11px', color: '#555', marginBottom: '6px' }}>{desc}</div>
+          {!showDetails ? (
+            <>
+              {incParts.length > 0 && <div style={{ fontSize: '11px', color: '#27ae60', fontWeight: 'bold' }}>{incParts.join(', ')}/s</div>}
+              {conParts.length > 0 && <div style={{ fontSize: '11px', color: '#e74c3c', marginTop: '2px' }}>Verbraucht: {conParts.join(', ')}/s</div>}
+              {bStats?.damage && <div style={{ fontSize: '11px', color: '#e67e22', marginTop: '2px' }}>Schaden: {bStats.damage}{bStats.range ? ` · Reichweite: ${bStats.range}` : ''}</div>}
+              {bStats?.range && !bStats?.damage && <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>Reichweite: {bStats.range}</div>}
+              <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>HP: {bStats?.maxHealth}</div>
+              <div style={{ fontSize: '10px', color: '#b2bec3', marginTop: '6px', fontStyle: 'italic' }}>Shift halten für Skalierung</div>
+            </>
+          ) : (
+            <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px', borderTop: '1px solid #eee', paddingTop: '4px' }}>
+              <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: 'bold', marginBottom: '1px' }}>Stufe 1 / 2 / 3 / 4 / 5</div>
+              {bStats?.damage && <div><span style={{ color: '#e67e22', fontWeight: 'bold' }}>Schaden:</span> {scaleVals(bStats.damage)}</div>}
+              {bStats?.range && <div><span style={{ color: '#7f8c8d' }}>Reichweite:</span> {bStats.range} (fest)</div>}
+              {bStats?.income?.energy && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Energie:</span> {scaleVals(bStats.income.energy)}/s</div>}
+              {bStats?.income?.scrap && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Schrott:</span> {scaleVals(bStats.income.scrap)}/s</div>}
+              {bStats?.income?.steel && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Stahl:</span> {scaleVals(bStats.income.steel)}/s</div>}
+              {bStats?.income?.electronics && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>E-Komp:</span> {scaleVals(bStats.income.electronics)}/s</div>}
+              {bStats?.income?.data && <div><span style={{ color: '#27ae60', fontWeight: 'bold' }}>Daten:</span> {scaleVals(bStats.income.data)}/s</div>}
+              <div><span style={{ color: '#7f8c8d' }}>HP:</span> {scaleVals(bStats?.maxHealth || 0)}</div>
+              {conParts.length > 0 && <div style={{ color: '#e74c3c', marginTop: '2px' }}>Verbraucht: {conParts.join(', ')}/s (fest)</div>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BUILDING_DESC: Record<number, string> = {
   [TileType.SOLAR_PANEL]: 'Erzeugt Energie. Überall platzierbar.',
   [TileType.MINER]: 'Baut Schrott ab. Auf Erzvorkommen platzieren.',
@@ -457,14 +654,41 @@ const BUILDING_DESC: Record<number, string> = {
   [TileType.DATA_VAULT]: 'Verstärkt Geschützschaden +15%. Verbraucht Energie+Daten.',
 };
 
+const BUILDING_COLORS: Record<number, string> = {
+  [TileType.SOLAR_PANEL]: '#f1c40f', [TileType.MINER]: '#9b59b6', [TileType.WALL]: '#576574',
+  [TileType.TURRET]: '#e67e22', [TileType.HEAVY_TURRET]: '#c0392b', [TileType.TESLA_COIL]: '#6c5ce7',
+  [TileType.PLASMA_CANNON]: '#fd79a8', [TileType.SLOW_FIELD]: '#a29bfe', [TileType.SHIELD_GENERATOR]: '#74b9ff',
+  [TileType.RADAR_STATION]: '#fdcb6e', [TileType.REPAIR_BAY]: '#e056a0', [TileType.FOUNDRY]: '#ff9f43',
+  [TileType.FABRICATOR]: '#1dd1a1', [TileType.RECYCLER]: '#55efc4', [TileType.LAB]: '#54a0ff',
+  [TileType.DATA_VAULT]: '#00cec9',
+};
+
 const scaleVals = (base: number) => [1, 1.5, 2, 2.5, 3].map(m => Math.round(base * m * 10) / 10).join(' / ');
 
-const BuildBtn = ({ type, selected, set, label, cost, color, affordable = true }: any) => {
+const BuildBtn = ({ type, selected, set, label, cost, color, affordable = true, locked = false }: any) => {
   const [hover, setHover] = React.useState(false);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const [shift, setShift] = React.useState(false);
   const stats = BUILDING_STATS[type];
   const desc = BUILDING_DESC[type] || '';
+
+  if (locked) {
+    const techNode = TECH_TREE.find(n => n.unlocks === type);
+    return (
+      <button disabled style={{
+        padding: '12px', backgroundColor: '#f8f9fa',
+        border: '1px solid #dfe4ea', color: '#b2bec3',
+        textAlign: 'left', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: '10px',
+        borderRadius: '8px', opacity: 0.4, width: '100%'
+      }}>
+        <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: '#dfe4ea', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>🔒</div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{label}</span>
+          <span style={{ fontSize: '11px' }}>{techNode ? `${techNode.killCost} KP im Techbaum` : 'Gesperrt'}</span>
+        </div>
+      </button>
+    );
+  }
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => { if (e.key === 'Shift') setShift(true); };
