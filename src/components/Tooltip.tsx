@@ -1,4 +1,4 @@
-import { MODULE_DEFS } from '../game/Grid';
+import { MODULE_DEFS } from '../config';
 
 interface TooltipProps {
   x: number;

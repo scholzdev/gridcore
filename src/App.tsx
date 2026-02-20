@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GameEngine } from './game/Engine';
 import type { Difficulty, GameMode, TileStats } from './game/types';
-import { STARTER_BUILDINGS } from './game/TechTree';
-import type { TechNode } from './game/TechTree';
-import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS } from './game/Grid';
+import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS, STARTER_BUILDINGS, BUILDING_NAMES } from './config';
+import type { TechNode } from './config';
+import { fireOnPlace, fireOnRemove, fireOnUpgrade } from './game/HookSystem';
 import { loadPrestige, savePrestige, resetPrestige, getUpgradeCost, getAvailablePoints, PRESTIGE_UPGRADES } from './game/Prestige';
 import type { PrestigeData, PrestigeBonuses } from './game/Prestige';
 import { StartScreen } from './components/StartScreen';
@@ -20,8 +20,6 @@ import { GuideOverlay } from './components/GuideOverlay';
 import { MobileWarning } from './components/MobileWarning';
 import type { MarketState } from './game/Market';
 import type { ResearchState } from './game/Research';
-
-import { BUILDING_NAMES } from './components/constants';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -331,6 +329,7 @@ function App() {
       if (upgradeCost && engineRef.current.resources.canAfford(upgradeCost)) {
         if (engineRef.current.grid.upgradeBuilding(worldX, worldY)) {
           engineRef.current.resources.spend(upgradeCost);
+          fireOnUpgrade(engineRef.current, worldX, worldY, currentLevel, currentLevel + 1);
           setResources({ ...engineRef.current.resources.state });
         }
       }
@@ -341,6 +340,7 @@ function App() {
           engineRef.current.resources.spend(cost);
           engineRef.current.purchasedCounts[selectedBuilding] = (engineRef.current.purchasedCounts[selectedBuilding] || 0) + 1;
           engineRef.current.buildingsPlaced++;
+          fireOnPlace(engineRef.current, worldX, worldY);
           setResources({ ...engineRef.current.resources.state });
         }
       }
@@ -361,6 +361,7 @@ function App() {
     const refund = engineRef.current.getRefund(type, level);
     const removedLevel = engineRef.current.grid.removeBuilding(worldX, worldY);
     if (removedLevel > 0) {
+      fireOnRemove(engineRef.current, worldX, worldY, type, level, refund);
       engineRef.current.resources.add(refund);
       if (engineRef.current.purchasedCounts[type] > 0) engineRef.current.purchasedCounts[type]--;
       setResources({ ...engineRef.current.resources.state });

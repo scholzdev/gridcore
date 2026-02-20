@@ -1,6 +1,5 @@
-import { TileType } from '../game/Grid';
-import { TECH_TREE } from '../game/TechTree';
-import type { TechNode } from '../game/TechTree';
+import { TileType, TECH_TREE } from '../config';
+import type { TechNode } from '../config';
 import { TechNodeCard } from './TechNodeCard';
 
 interface TechTreeOverlayProps {

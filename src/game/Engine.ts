@@ -1,4 +1,5 @@
-import { GameGrid, TileType, BUILDING_STATS, ModuleType } from './Grid';
+import { GameGrid } from './Grid';
+import { TileType, BUILDING_STATS, BUILDING_REGISTRY, getMaxHP, getLevelMult } from '../config';
 import { ResourceManager } from './Resources';
 import { Renderer } from './Renderer';
 import { detonateMines, moveEnemies, turretLogic, updateProjectiles, updateParticles, updateDrones } from './Combat';
@@ -10,8 +11,9 @@ import type { MarketState } from './Market';
 import { createResearchState, computeResearchBuffs, getResearchLevel, getResearchCost, canResearch, RESEARCH_NODES } from './Research';
 import type { ResearchState, ResearchBuffs } from './Research';
 import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
-import { DIFFICULTY_PRESETS } from './types';
+import { DIFFICULTY_PRESETS, WAVE_CONFIG } from './types';
 import type { TechNode } from './TechTree';
+import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech } from './HookSystem';
 
 export class GameEngine {
   grid: GameGrid;
@@ -112,17 +114,19 @@ export class GameEngine {
     if (!this.placingCore) return false;
     if (!this.grid.placeCore(x, y)) return false;
     this.placingCore = false;
+    fireOnGameStart(this);
     return true;
   }
 
   startNextWave() {
     this.currentWave++;
-    this.waveEnemiesTotal = 5 + this.currentWave * 3;
+    this.waveEnemiesTotal = WAVE_CONFIG.enemiesBase + this.currentWave * WAVE_CONFIG.enemiesPerWave;
     this.waveEnemiesSpawned = 0;
     this.waveEnemiesKilledThisWave = 0;
     this.waveBuildPhase = false;
     this.waveActive = true;
     this.waveSpawnTimer = 0;
+    fireOnWaveStart(this, this.currentWave, this.waveEnemiesTotal);
   }
 
   unlockBuilding(node: TechNode): boolean {
@@ -131,6 +135,7 @@ export class GameEngine {
     this.killPoints -= node.killCost;
     this.unlockedBuildings.add(node.unlocks);
     saveUnlocks(this.unlockedBuildings);
+    fireOnUnlockTech(this, node.id, node.name, node.unlocks);
     return true;
   }
 
@@ -161,7 +166,7 @@ export class GameEngine {
     this.waveEnemiesSpawned = 0;
     this.waveEnemiesKilledThisWave = 0;
     this.waveBuildPhase = true;
-    this.waveBuildTimer = 20;
+    this.waveBuildTimer = WAVE_CONFIG.initialBuildTime;
     this.waveActive = false;
     this.waveSpawnTimer = 0;
     this.tileStats.clear();
@@ -393,6 +398,7 @@ export class GameEngine {
         this.prestige.totalPoints += this.prestigeEarned;
         savePrestige(this.prestige);
         this.prestigeAwarded = true;
+        fireOnPrestige(this, this.prestigeEarned, this.prestige.totalPoints);
       }
       this.renderer.drawGameOver(this);
       return;
@@ -423,7 +429,7 @@ export class GameEngine {
       if (timestamp > this.nextSpawnTime) {
         this.spawnWaveEnemy();
         this.waveEnemiesSpawned++;
-        const waveSpawnDelay = Math.max(300, 1200 - this.currentWave * 50);
+        const waveSpawnDelay = Math.max(WAVE_CONFIG.spawnDelayMin, WAVE_CONFIG.spawnDelayBase - this.currentWave * WAVE_CONFIG.spawnDelayPerWave);
         this.nextSpawnTime = timestamp + waveSpawnDelay;
       }
     }
@@ -463,18 +469,19 @@ export class GameEngine {
         const level = this.grid.levels[y][x] || 1;
         const stats = BUILDING_STATS[type];
         if (!stats) continue;
-        const mult = 1 + (level - 1) * 0.5;
-        const mod = this.grid.modules[y][x];
+        const mult = getLevelMult(level);
+
+        // Fire onTick hook BEFORE consumes — hooks may modify consumeMult & healAmount
+        const tickEvent = fireOnTick(this, x, y, this.gameTime);
 
         // Consumes
         if (stats.consumes) {
           const consumes = { ...stats.consumes };
-          if (mod === ModuleType.EFFICIENCY) {
-            if (consumes.energy) consumes.energy *= 0.5;
-            if (consumes.scrap) consumes.scrap *= 0.5;
-            if (consumes.electronics) consumes.electronics *= 0.5;
-            if (consumes.data) consumes.data *= 0.5;
-          }
+          // Apply hook-driven consume multiplier (e.g. Efficiency module sets consumeMult = 0.5)
+          if (consumes.energy) consumes.energy *= tickEvent.consumeMult;
+          if (consumes.scrap) consumes.scrap *= tickEvent.consumeMult;
+          if (consumes.electronics) consumes.electronics *= tickEvent.consumeMult;
+          if (consumes.data) consumes.data *= tickEvent.consumeMult;
           // Research: energy consume reduction
           if (consumes.energy) consumes.energy *= this.researchBuffs.energyConsumeMult;
           if (!this.resources.canAfford(consumes)) continue;
@@ -486,69 +493,86 @@ export class GameEngine {
         }
         this.activeTiles[y][x] = true;
 
+        // Apply heal from onTick hooks (e.g. Regen module)
+        if (tickEvent.healAmount > 0) {
+          const maxHP = getMaxHP(type, level);
+          this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + tickEvent.healAmount);
+        }
+
         // Income
         if (stats.income) {
-          const incomeMult = (mod === ModuleType.OVERCHARGE ? mult * 1.6 : mult) * this.prestigeIncomeMult * this.researchBuffs.incomeMult;
-          const doubleRoll = mod === ModuleType.DOUBLE_YIELD && Math.random() < 0.2 ? 2 : 1;
           const income = { ...stats.income };
-          // Research: data output boost for labs
-          if (type === TileType.LAB && income.data) {
-            income.data *= this.researchBuffs.dataOutputMult;
-          }
-          if (income.energy) { income.energy *= incomeMult * doubleRoll; tickIncome.energy += income.energy; }
-          if (income.scrap) { income.scrap *= incomeMult * doubleRoll; tickIncome.scrap += income.scrap; }
-          if (income.steel) { income.steel *= incomeMult * doubleRoll; tickIncome.steel += income.steel; }
-          if (income.electronics) { income.electronics *= incomeMult * doubleRoll; tickIncome.electronics += income.electronics; }
-          if (income.data) { income.data *= incomeMult * doubleRoll; tickIncome.data += income.data; }
-          this.resources.add(income);
+          // Base multipliers (level + prestige + research)
+          const baseMult = mult * this.prestigeIncomeMult * this.researchBuffs.incomeMult;
+          if (income.energy) income.energy *= baseMult;
+          if (income.scrap) income.scrap *= baseMult;
+          if (income.steel) income.steel *= baseMult;
+          if (income.electronics) income.electronics *= baseMult;
+          if (income.data) income.data *= baseMult;
+
+          // Fire onResourceGained — hooks can modify incomeMult (Overcharge, DoubleYield, Lab dataOutputMult)
+          const rgEvent = fireOnResourceGained(this, x, y, {
+            energy: income.energy || 0, scrap: income.scrap || 0,
+            steel: income.steel || 0, electronics: income.electronics || 0,
+            data: income.data || 0,
+          });
+
+          // Apply hook-driven income multiplier
+          const finalMult = rgEvent.incomeMult;
+          const finalIncome = rgEvent.income;
+          if (finalIncome.energy) { finalIncome.energy *= finalMult; tickIncome.energy += finalIncome.energy; }
+          if (finalIncome.scrap) { finalIncome.scrap *= finalMult; tickIncome.scrap += finalIncome.scrap; }
+          if (finalIncome.steel) { finalIncome.steel *= finalMult; tickIncome.steel += finalIncome.steel; }
+          if (finalIncome.electronics) { finalIncome.electronics *= finalMult; tickIncome.electronics += finalIncome.electronics; }
+          if (finalIncome.data) { finalIncome.data *= finalMult; tickIncome.data += finalIncome.data; }
+          this.resources.add(finalIncome);
         }
 
-        // Regeneration module: self-heal 2% max HP per tick
-        if (mod === ModuleType.REGEN) {
-          const maxHP = (stats.maxHealth || 100) * (1 + (level - 1) * 0.5);
-          const healAmt = maxHP * 0.02;
-          this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + healAmt);
-        }
+        // ── Generic aura / support effects (config-driven) ──
+        const cfg = BUILDING_REGISTRY[type];
+        if (cfg?.support) {
+          const baseRange = stats.range || 0;
+          const auraEvent = fireOnAuraTick(this, x, y, this.gameTime, baseRange);
+          const auraRange = auraEvent.range;
 
-        // Repair Bay
-        if (type === TileType.REPAIR_BAY) {
-          const healAmount = 50 * mult * this.researchBuffs.repairMult;
-          const range = (stats.range || 3) + (mod === ModuleType.RANGE_BOOST ? 3 : 0);
-          for (let dy = -range; dy <= range; dy++) {
-            for (let dx = -range; dx <= range; dx++) {
-              const nx = x + dx; const ny = y + dy;
-              if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
-              if (Math.sqrt(dx * dx + dy * dy) > range) continue;
-              const nType = this.grid.tiles[ny][nx];
-              if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
-                const nLevel = this.grid.levels[ny][nx] || 1;
-                const maxHP = (BUILDING_STATS[nType]?.maxHealth || 100) * (1 + (nLevel - 1) * 0.5);
-                this.grid.healths[ny][nx] = Math.min(maxHP, this.grid.healths[ny][nx] + healAmount);
+          // Repair aura
+          if (cfg.support.healPerTick && auraRange > 0) {
+            const healAmt = cfg.support.healPerTick * mult * this.researchBuffs.repairMult;
+            for (let dy = -auraRange; dy <= auraRange; dy++) {
+              for (let dx = -auraRange; dx <= auraRange; dx++) {
+                const nx = x + dx; const ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+                if (Math.sqrt(dx * dx + dy * dy) > auraRange) continue;
+                const nType = this.grid.tiles[ny][nx];
+                if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
+                  const nLevel = this.grid.levels[ny][nx] || 1;
+                  const maxHP = getMaxHP(nType, nLevel);
+                  this.grid.healths[ny][nx] = Math.min(maxHP, this.grid.healths[ny][nx] + healAmt);
+                }
               }
             }
           }
-        }
 
-        // Shield Generator
-        if (type === TileType.SHIELD_GENERATOR) {
-          const cap = 500 * mult * this.researchBuffs.shieldMult;
-          const range = (stats.range || 4) + (mod === ModuleType.RANGE_BOOST ? 3 : 0);
-          for (let dy = -range; dy <= range; dy++) {
-            for (let dx = -range; dx <= range; dx++) {
-              const nx = x + dx; const ny = y + dy;
-              if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
-              if (Math.sqrt(dx * dx + dy * dy) > range) continue;
-              const nType = this.grid.tiles[ny][nx];
-              if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
-                this.grid.shields[ny][nx] = Math.max(this.grid.shields[ny][nx], cap);
+          // Shield aura
+          if (cfg.support.shieldCap && auraRange > 0) {
+            const cap = cfg.support.shieldCap * mult * this.researchBuffs.shieldMult;
+            for (let dy = -auraRange; dy <= auraRange; dy++) {
+              for (let dx = -auraRange; dx <= auraRange; dx++) {
+                const nx = x + dx; const ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+                if (Math.sqrt(dx * dx + dy * dy) > auraRange) continue;
+                const nType = this.grid.tiles[ny][nx];
+                if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
+                  this.grid.shields[ny][nx] = Math.max(this.grid.shields[ny][nx], cap);
+                }
               }
             }
           }
-        }
 
-        // Data Vault
-        if (type === TileType.DATA_VAULT) {
-          this.dataVaultBuff += 0.15 * mult;
+          // Global damage buff
+          if (cfg.support.damageBuff) {
+            this.dataVaultBuff += cfg.support.damageBuff * mult;
+          }
         }
       }
     }
@@ -589,27 +613,31 @@ export class GameEngine {
   // ── Spawning ───────────────────────────────────────────────
 
   spawnEnemy() {
+    const s = this.grid.size;
+    const edge = s - 1;
     const side = Math.floor(Math.random() * 4);
     let x = 0, y = 0;
-    if (side === 0) { x = Math.random() * 30; y = 0; }
-    if (side === 1) { x = 29; y = Math.random() * 30; }
-    if (side === 2) { x = Math.random() * 30; y = 29; }
-    if (side === 3) { x = 0; y = Math.random() * 30; }
+    if (side === 0) { x = Math.random() * s; y = 0; }
+    if (side === 1) { x = edge; y = Math.random() * s; }
+    if (side === 2) { x = Math.random() * s; y = edge; }
+    if (side === 3) { x = 0; y = Math.random() * s; }
     const hp = this.diffConfig.baseHp + (this.gameTime * this.diffConfig.hpPerSec);
     const speed = this.diffConfig.baseSpeed + (this.gameTime * this.diffConfig.speedPerSec);
     this.enemies.push({ id: Math.random().toString(36), x, y, health: hp, maxHealth: hp, speed, lastHit: 0 });
   }
 
   spawnWaveEnemy() {
+    const s = this.grid.size;
+    const edge = s - 1;
     const side = Math.floor(Math.random() * 4);
     let x = 0, y = 0;
-    if (side === 0) { x = Math.random() * 30; y = 0; }
-    if (side === 1) { x = 29; y = Math.random() * 30; }
-    if (side === 2) { x = Math.random() * 30; y = 29; }
-    if (side === 3) { x = 0; y = Math.random() * 30; }
+    if (side === 0) { x = Math.random() * s; y = 0; }
+    if (side === 1) { x = edge; y = Math.random() * s; }
+    if (side === 2) { x = Math.random() * s; y = edge; }
+    if (side === 3) { x = 0; y = Math.random() * s; }
     const wave = this.currentWave;
-    const hp = this.diffConfig.baseHp * (1 + (wave - 1) * 0.4);
-    const speed = this.diffConfig.baseSpeed * (1 + (wave - 1) * 0.08);
+    const hp = this.diffConfig.baseHp * (1 + (wave - 1) * WAVE_CONFIG.hpScalingPerWave);
+    const speed = this.diffConfig.baseSpeed * (1 + (wave - 1) * WAVE_CONFIG.speedScalingPerWave);
     this.enemies.push({ id: Math.random().toString(36), x, y, health: hp, maxHealth: hp, speed, lastHit: 0 });
   }
 
@@ -618,7 +646,11 @@ export class GameEngine {
     if (this.waveEnemiesSpawned >= this.waveEnemiesTotal && this.enemies.length === 0) {
       this.waveActive = false;
       this.waveBuildPhase = true;
-      this.waveBuildTimer = 15;
+      this.waveBuildTimer = WAVE_CONFIG.betweenWavesBuildTime;
+      fireOnWaveEnd(this, this.currentWave, this.waveEnemiesTotal, this.waveEnemiesKilledThisWave);
     }
   }
+
+  // ── GameCtx interface helpers ──────────────────────────────
+  addParticle(p: Particle) { this.particles.push(p); }
 }

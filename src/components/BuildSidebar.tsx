@@ -1,4 +1,4 @@
-import { TileType, ModuleType } from '../game/Grid';
+import { TileType, ModuleType } from '../config';
 import { BuildBtn, BuildGroup } from './BuildBtn';
 
 interface BuildSidebarProps {

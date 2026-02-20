@@ -28,7 +28,39 @@ export interface Enemy {
   speed: number;
   lastHit: number;
   slowedUntil?: number; // timestamp until which enemy is slowed
+  /** Slow multiplier applied while slowedUntil is active (set by slow-on-hit module) */
+  slowFactor?: number;
 }
+
+// ── Wave Mode Constants ──────────────────────────────────────
+export const WAVE_CONFIG = {
+  /** Base enemy count per wave */
+  enemiesBase: 5,
+  /** Additional enemies per wave */
+  enemiesPerWave: 3,
+  /** Base delay between spawns (ms) */
+  spawnDelayBase: 1200,
+  /** Delay reduction per wave (ms) */
+  spawnDelayPerWave: 50,
+  /** Minimum spawn delay (ms) */
+  spawnDelayMin: 300,
+  /** HP scaling multiplier per wave */
+  hpScalingPerWave: 0.4,
+  /** Speed scaling multiplier per wave */
+  speedScalingPerWave: 0.08,
+  /** Initial build phase duration (ticks) */
+  initialBuildTime: 20,
+  /** Between-waves build phase duration (ticks) */
+  betweenWavesBuildTime: 15,
+};
+
+// ── Kill Reward Formula ──────────────────────────────────────
+export const KILL_REWARD = {
+  /** Base scrap reward per kill */
+  base: 30,
+  /** Additional scrap per second of game time */
+  perSecond: 0.1,
+};
 
 export interface Projectile {
   id: string;

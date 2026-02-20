@@ -1,33 +1,7 @@
-import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS } from './Grid';
+import { TileType, ModuleType } from '../config';
+import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, getMaxHP } from '../config';
 import type { Enemy, Drone, LaserBeam, DamageNumber } from './types';
 import type { GameEngine } from './Engine';
-
-// FESTE FARB-PALETTE
-const TILE_COLORS: Record<number, string> = {
-  [TileType.CORE]: '#00d2d3',
-  [TileType.SOLAR_PANEL]: '#f1c40f',
-  [TileType.MINER]: '#9b59b6',
-  [TileType.TURRET]: '#e67e22',
-  [TileType.HEAVY_TURRET]: '#c0392b',
-  [TileType.WALL]: '#7f8c8d',
-  [TileType.FOUNDRY]: '#d35400',
-  [TileType.FABRICATOR]: '#27ae60',
-  [TileType.LAB]: '#2980b9',
-  [TileType.ORE_PATCH]: '#ced6e0',
-  [TileType.REPAIR_BAY]: '#e056a0',
-  [TileType.SLOW_FIELD]: '#a29bfe',
-  [TileType.TESLA_COIL]: '#6c5ce7',
-  [TileType.SHIELD_GENERATOR]: '#74b9ff',
-  [TileType.RADAR_STATION]: '#fdcb6e',
-  [TileType.DATA_VAULT]: '#00cec9',
-  [TileType.PLASMA_CANNON]: '#fd79a8',
-  [TileType.RECYCLER]: '#55efc4',
-  [TileType.LASER_TURRET]: '#e84393',
-  [TileType.MINEFIELD]: '#d63031',
-  [TileType.DRONE_HANGAR]: '#0984e3',
-  [TileType.CRYSTAL_DRILL]: '#1abc9c',
-  [TileType.STEEL_SMELTER]: '#e17055',
-};
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -62,7 +36,7 @@ export class Renderer {
         const px = x * zoom;
         const py = y * zoom;
 
-        if (type === TileType.ORE_PATCH || type === TileType.MINER || type === TileType.CRYSTAL_DRILL || type === TileType.STEEL_SMELTER) {
+        if (type === TileType.ORE_PATCH || (BUILDING_REGISTRY[type]?.requiresOre)) {
           ctx.fillStyle = TILE_COLORS[TileType.ORE_PATCH];
           ctx.fillRect(px + 2, py + 2, zoom - 4, zoom - 4);
         }
@@ -76,8 +50,7 @@ export class Renderer {
 
           // HP bar — only when damaged
           const hp = grid.healths[y][x];
-          const baseMax = BUILDING_STATS[type]?.maxHealth || 100;
-          const max = baseMax * (1 + (level - 1) * 0.5);
+          const max = getMaxHP(type, level);
           if (hp < max) {
             ctx.fillStyle = '#ecf0f1'; ctx.fillRect(px + p, py + zoom - p - 5, s, 5);
             ctx.fillStyle = hp / max > 0.5 ? '#2ecc71' : hp / max > 0.25 ? '#f39c12' : '#e74c3c';
@@ -283,12 +256,12 @@ export class Renderer {
 
     if (existingType !== TileType.EMPTY && existingType !== TileType.ORE_PATCH) {
       // Hovering over existing building — show its range
-      const stats = BUILDING_STATS[existingType];
-      if (stats?.range) range = stats.range;
+      const cfg = BUILDING_REGISTRY[existingType];
+      if (cfg?.range) range = cfg.range;
     } else {
       // Placing a new building — show selected building's range
-      const stats = BUILDING_STATS[engine.selectedPlacement];
-      if (stats?.range) range = stats.range;
+      const cfg = BUILDING_REGISTRY[engine.selectedPlacement];
+      if (cfg?.range) range = cfg.range;
     }
 
     if (range <= 0) return;

@@ -1,7 +1,5 @@
 import React from 'react';
-import { TileType, BUILDING_STATS } from '../game/Grid';
-import { TECH_TREE } from '../game/TechTree';
-import { BUILDING_DESC, scaleVals } from './constants';
+import { TileType, BUILDING_STATS, TECH_TREE, BUILDING_DESC, scaleVals } from '../config';
 
 export const BuildGroup = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

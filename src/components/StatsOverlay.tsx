@@ -1,5 +1,4 @@
-import { TileType } from '../game/Grid';
-import { BUILDING_NAMES } from './constants';
+import { TileType, BUILDING_NAMES } from '../config';
 import type { TileStats } from '../game/types';
 
 interface StatsOverlayProps {

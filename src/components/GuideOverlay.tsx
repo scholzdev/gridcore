@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { TileType, BUILDING_STATS, MODULE_DEFS } from '../game/Grid';
-import { BUILDING_NAMES, BUILDING_DESC, BUILDING_COLORS } from './constants';
+import { BUILDING_STATS, MODULE_DEFS, BUILDING_NAMES, BUILDING_DESC, BUILDING_COLORS, GUIDE_CATEGORIES } from '../config';
 
 interface GuideOverlayProps {
   onClose: () => void;
@@ -117,11 +116,7 @@ function BasicsTab() {
 }
 
 function BuildingsTab() {
-  const categories = [
-    { title: '⚔️ Verteidigung', types: [TileType.TURRET, TileType.HEAVY_TURRET, TileType.TESLA_COIL, TileType.LASER_TURRET, TileType.PLASMA_CANNON, TileType.DRONE_HANGAR, TileType.MINEFIELD] },
-    { title: '🏭 Produktion', types: [TileType.SOLAR_PANEL, TileType.MINER, TileType.STEEL_SMELTER, TileType.CRYSTAL_DRILL, TileType.FOUNDRY, TileType.FABRICATOR, TileType.RECYCLER, TileType.LAB] },
-    { title: '🛡️ Unterstützung', types: [TileType.WALL, TileType.REPAIR_BAY, TileType.SLOW_FIELD, TileType.SHIELD_GENERATOR, TileType.RADAR_STATION, TileType.DATA_VAULT] },
-  ];
+  const categories = GUIDE_CATEGORIES;
 
   return (
     <div>

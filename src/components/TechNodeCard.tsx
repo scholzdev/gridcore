@@ -1,7 +1,6 @@
 import React from 'react';
-import { BUILDING_STATS } from '../game/Grid';
-import type { TechNode } from '../game/TechTree';
-import { BUILDING_DESC, BUILDING_COLORS, scaleVals } from './constants';
+import { BUILDING_STATS, BUILDING_DESC, BUILDING_COLORS, scaleVals } from '../config';
+import type { TechNode } from '../config';
 
 interface TechNodeCardProps {
   node: TechNode;
