@@ -15,6 +15,7 @@ export const HYPER_REACTOR_CONFIG: BuildingConfig = {
   income: {
     energy: 200,
   },
+  consumes: { steel: 5, electronics: 3, data: 2 },
 
   explosionOnDestroy: 5,
   explosionDamage: 3000,

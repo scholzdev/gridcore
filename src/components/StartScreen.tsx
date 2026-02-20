@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { DIFFICULTY_PRESETS } from '../game/types';
 import type { Difficulty, GameMode } from '../game/types';
 
@@ -6,9 +7,14 @@ interface StartScreenProps {
   setGameMode: (m: GameMode) => void;
   setDifficulty: (d: Difficulty) => void;
   setGameStarted: (b: boolean) => void;
+  seed: string;
+  setSeed: (s: string) => void;
 }
 
-export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStarted }: StartScreenProps) => (
+export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStarted, seed, setSeed }: StartScreenProps) => {
+  const [showSeed, setShowSeed] = useState(false);
+
+  return (
   <div style={{
     backgroundColor: '#f1f2f6', color: '#2d3436', height: '100vh', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', gap: '40px'
@@ -59,5 +65,39 @@ export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStart
         );
       })}
     </div>
+
+    {/* Seed Input */}
+    <div style={{ textAlign: 'center' }}>
+      <button
+        onClick={() => setShowSeed(!showSeed)}
+        style={{
+          background: 'none', border: 'none', fontSize: '12px', color: '#b2bec3',
+          cursor: 'pointer', fontFamily: 'monospace', textDecoration: 'underline'
+        }}
+      >
+        🌱 Seed eingeben (optional)
+      </button>
+      {showSeed && (
+        <div style={{ marginTop: '8px' }}>
+          <input
+            type="text"
+            value={seed}
+            onChange={(e) => setSeed(e.target.value.toUpperCase().slice(0, 10))}
+            placeholder="z.B. ABC123 (leer = zufällig)"
+            maxLength={10}
+            style={{
+              padding: '8px 14px', borderRadius: '8px', border: '2px solid #dfe4ea',
+              fontSize: '16px', fontFamily: 'monospace', textAlign: 'center',
+              width: '240px', outline: 'none', letterSpacing: '2px',
+              color: '#2d3436', backgroundColor: '#fff'
+            }}
+          />
+          <div style={{ fontSize: '10px', color: '#b2bec3', marginTop: '4px' }}>
+            Gleicher Seed = gleiche Karte (Erzverteilung)
+          </div>
+        </div>
+      )}
+    </div>
   </div>
-);
+  );
+};

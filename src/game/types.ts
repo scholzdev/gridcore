@@ -14,9 +14,9 @@ export interface DifficultyConfig {
 }
 
 export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
-  leicht: { label: 'Leicht', baseHp: 100, hpPerSec: 3, baseSpeed: 0.015, speedPerSec: 0.00006, spawnBase: 2500, spawnReduction: 10, spawnMin: 600, enemyDamage: 60 },
-  mittel: { label: 'Mittel', baseHp: 150, hpPerSec: 5, baseSpeed: 0.02, speedPerSec: 0.0001, spawnBase: 2000, spawnReduction: 12, spawnMin: 400, enemyDamage: 100 },
-  schwer: { label: 'Schwer', baseHp: 200, hpPerSec: 8, baseSpeed: 0.025, speedPerSec: 0.00015, spawnBase: 1500, spawnReduction: 15, spawnMin: 250, enemyDamage: 150 },
+  leicht: { label: 'Leicht', baseHp: 120, hpPerSec: 4, baseSpeed: 0.018, speedPerSec: 0.00008, spawnBase: 2200, spawnReduction: 15, spawnMin: 500, enemyDamage: 80 },
+  mittel: { label: 'Mittel', baseHp: 180, hpPerSec: 6, baseSpeed: 0.022, speedPerSec: 0.00012, spawnBase: 1800, spawnReduction: 18, spawnMin: 350, enemyDamage: 120 },
+  schwer: { label: 'Schwer', baseHp: 250, hpPerSec: 10, baseSpeed: 0.028, speedPerSec: 0.00018, spawnBase: 1300, spawnReduction: 20, spawnMin: 200, enemyDamage: 180 },
 };
 
 export interface Enemy {
@@ -36,20 +36,20 @@ export interface Enemy {
 
 // ── Wave Mode Constants ──────────────────────────────────────
 export const WAVE_CONFIG = {
-  /** Base enemy count per wave */
-  enemiesBase: 5,
-  /** Additional enemies per wave */
-  enemiesPerWave: 3,
+  /** Base enemy count for wave 1 */
+  enemiesBase: 8,
+  /** Exponential growth factor per wave */
+  enemiesGrowth: 1.11,
   /** Base delay between spawns (ms) */
   spawnDelayBase: 1200,
   /** Delay reduction per wave (ms) */
   spawnDelayPerWave: 50,
   /** Minimum spawn delay (ms) */
   spawnDelayMin: 300,
-  /** HP scaling multiplier per wave */
-  hpScalingPerWave: 0.4,
-  /** Speed scaling multiplier per wave */
-  speedScalingPerWave: 0.08,
+  /** HP scaling multiplier per wave (exponential base) */
+  hpScalingPerWave: 0.35,
+  /** Speed scaling multiplier per wave (exponential base) */
+  speedScalingPerWave: 0.06,
   /** Initial build phase duration (ticks) */
   initialBuildTime: 30,
   /** Between-waves build phase duration (ticks) */

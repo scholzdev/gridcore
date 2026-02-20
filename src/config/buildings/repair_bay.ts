@@ -12,7 +12,7 @@ export const REPAIR_BAY_CONFIG: BuildingConfig = {
   range: 3,
   cost: { scrap: 80, energy: 30 },
   costIncrease: { scrap: 30, energy: 10 },
-  consumes: { energy: 10 },
+  consumes: { energy: 5 },
 
   support: {
     healPerTick: 50,

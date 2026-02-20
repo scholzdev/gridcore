@@ -12,7 +12,7 @@ export const ENERGY_RELAY_CONFIG: BuildingConfig = {
   range: 5,
   cost: { steel: 150, electronics: 100, data: 50 },
   costIncrease: { steel: 75, electronics: 50, data: 25 },
-  consumes: { energy: 20 },
+  consumes: { energy: 10 },
 
   support: {
     fireRateBuffBase: 0.04,
@@ -21,7 +21,7 @@ export const ENERGY_RELAY_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'relay',
-    killCost: 200,
+    killCost: 50,
     tier: 4,
     shortDescription: 'Erhöht Geschütz-Feuerrate',
   },

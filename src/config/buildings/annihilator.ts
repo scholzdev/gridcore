@@ -8,12 +8,12 @@ export const ANNIHILATOR_CONFIG: BuildingConfig = {
   color: '#ff006e',
   category: 'defense',
 
-  health: 10000,
-  range: 100, // global
-  damage: 1000,
+  health: 1337,
+  range: 100,
+  damage: 1337,
   cost: { steel: 1200, electronics: 900, data: 700 },
-  costIncrease: { steel: 600, electronics: 450, data: 350 },
-  consumes: { energy: 100 },
+  costIncrease: { steel: 1500, electronics: 1200, data: 1000 },
+  consumes: { energy: 100, data: 8 },
 
   combat: {
     fireChance: 1,

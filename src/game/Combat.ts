@@ -1,13 +1,25 @@
-import { TileType, BUILDING_STATS, BUILDING_REGISTRY, ORE_BUILDINGS, getLevelMult } from '../config';
+import { TileType, BUILDING_STATS, BUILDING_REGISTRY, ORE_BUILDINGS, getLevelMult, ModuleType } from '../config';
 import type { BuildingConfig } from '../config';
 import type { Enemy } from './types';
 import { KILL_REWARD } from './types';
 import type { GameEngine } from './Engine';
 import { fireOnKill, fireOnHit, fireOnCombatTick, fireOnDestroyed, fireOnEnterKillRange, fireOnAllyDamaged, fireOnAuraTick, buildingRef } from './HookSystem';
+import { playKillThrottled, playShootThrottled, playCoreHit, playGameOver } from './Sound';
+import { isAbilityActive } from './Abilities';
+
+// Throttle core-hit so it doesn't spam
+let lastCoreHitTime = 0;
+function playCoreHitThrottled() {
+  const now = performance.now();
+  if (now - lastCoreHitTime < 500) return;
+  lastCoreHitTime = now;
+  playCoreHit();
+}
 
 function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?: number) {
   if (enemy.dead) return; // Already killed this tick — prevent double-counting
   enemy.dead = true;
+  playKillThrottled();
   engine.enemiesKilled++;
   engine.killPoints++;
   const killReward = Math.floor(KILL_REWARD.base + engine.gameTime * KILL_REWARD.perSecond);
@@ -247,7 +259,12 @@ export function turretLogic(engine: GameEngine) {
       const baseRange = (stats.range || 6) + radarBuff[y][x];
       const mult = getLevelMult(level);
       const baseDmg = (stats.damage!) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
-      const baseFireChance = (cfg.combat.fireChance ?? 0.9) - fireRateBuff[y][x];
+      let baseFireChance = (cfg.combat.fireChance ?? 0.9) - fireRateBuff[y][x];
+
+      // Overcharge ability: double fire rate (halve fireChance threshold)
+      if (isAbilityActive(engine.abilities, 'overcharge')) {
+        baseFireChance *= 0.5;
+      }
 
       // Fire onCombatTick — hooks (building + module) can mutate damage, fireChance, effectiveRange
       const inRange = engine.enemies.filter(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= baseRange);
@@ -277,6 +294,7 @@ function fireMultiTarget(engine: GameEngine, x: number, y: number, range: number
   const targets = engine.enemies.filter(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   const selected = targets.slice(0, maxTargets);
   if (selected.length > 0 && Math.random() > fireChance) {
+    playShootThrottled();
     selected.forEach(target => {
       engine.projectiles.push({
         id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
@@ -293,6 +311,7 @@ function fireSplash(engine: GameEngine, x: number, y: number, range: number, dmg
   const combat = bldg.combat!;
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target && Math.random() > (fireChance + (combat.fireChanceModifier ?? 0))) {
+    playShootThrottled();
     engine.projectiles.push({
       id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
       targetX: target.x, targetY: target.y, targetId: target.id,
@@ -342,6 +361,7 @@ function fireProjectile(engine: GameEngine, x: number, y: number, range: number,
   const combat = bldg.combat;
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target && Math.random() > fireChance) {
+    playShootThrottled();
     engine.projectiles.push({
       id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
       targetX: target.x, targetY: target.y, targetId: target.id,
@@ -493,6 +513,22 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     if (tile !== undefined && tile !== TileType.EMPTY && tile !== TileType.ORE_PATCH) {
       if (timestamp - e.lastHit > 1000) {
         let dmg = engine.diffConfig.enemyDamage;
+
+        // ── Absorber module: nearby walls with ABSORBER reduce incoming damage ──
+        const absorbR = 3;
+        let absorbMult = 1;
+        for (let ay = Math.max(0, ty - absorbR); ay <= Math.min(engine.grid.size - 1, ty + absorbR); ay++) {
+          for (let ax = Math.max(0, tx - absorbR); ax <= Math.min(engine.grid.size - 1, tx + absorbR); ax++) {
+            if (ax === tx && ay === ty) continue;
+            if (engine.grid.modules[ay]?.[ax] === ModuleType.ABSORBER) {
+              const dist = Math.sqrt(Math.pow(ax - tx, 2) + Math.pow(ay - ty, 2));
+              if (dist <= absorbR) { absorbMult = 0.75; break; }
+            }
+          }
+          if (absorbMult < 1) break;
+        }
+        dmg = Math.floor(dmg * absorbMult);
+
         if (engine.grid.shields[ty]?.[tx] > 0) {
           const absorbed = Math.min(dmg, engine.grid.shields[ty][tx]);
           engine.grid.shields[ty][tx] -= absorbed;
@@ -501,6 +537,22 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
         if (dmg > 0) {
           engine.grid.healths[ty][tx] -= dmg;
           engine.addDamageNumber(tx + 0.5, ty + 0.3, dmg, '#ff6b6b');
+          if (tile === TileType.CORE) playCoreHitThrottled();
+
+          // ── Thorns module: reflect 15% damage back to enemy ──
+          const tileModule = engine.grid.modules[ty]?.[tx];
+          if (tileModule === ModuleType.THORNS) {
+            const reflectDmg = Math.floor(engine.diffConfig.enemyDamage * 0.15);
+            e.hp -= reflectDmg;
+            engine.addDamageNumber(e.x, e.y - 0.3, reflectDmg, '#d63031');
+          }
+
+          // ── Wall Slow module: slow attacking enemy by 30% for 4s ──
+          if (tileModule === ModuleType.WALL_SLOW) {
+            e.slowedUntil = Date.now() + 4000;
+            e.slowFactor = 0.7;
+          }
+
           // Notify nearby buildings that an ally was damaged
           const allyRef = buildingRef(engine, tx, ty);
           const scanR = 6;
@@ -517,7 +569,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
         e.lastHit = timestamp;
         if (engine.grid.healths[ty][tx] <= 0) {
           fireOnDestroyed(engine, tx, ty, tile, e);
-          if (tile === TileType.CORE) engine.gameOver = true;
+          if (tile === TileType.CORE) { engine.gameOver = true; playGameOver(); }
 
           // Explosion on destroy (e.g. Hyperreaktor)
           const tileCfg = BUILDING_REGISTRY[tile];
@@ -535,7 +587,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
                   engine.addDamageNumber(ex + 0.5, ey + 0.3, expDmg, '#ffbe0b');
                   if (engine.grid.healths[ey][ex] <= 0) {
                     fireOnDestroyed(engine, ex, ey, nType, e);
-                    if (nType === TileType.CORE) engine.gameOver = true;
+                    if (nType === TileType.CORE) { engine.gameOver = true; playGameOver(); }
                     engine.grid.tiles[ey][ex] = ORE_BUILDINGS.includes(nType) ? TileType.ORE_PATCH : TileType.EMPTY;
                     engine.grid.levels[ey][ex] = 0;
                     engine.grid.shields[ey][ex] = 0;

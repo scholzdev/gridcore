@@ -13,7 +13,7 @@ export const SHOCKWAVE_TOWER_CONFIG: BuildingConfig = {
   damage: 200,
   cost: { steel: 750, electronics: 550, data: 400 },
   costIncrease: { steel: 375, electronics: 275, data: 200 },
-  consumes: { energy: 80 },
+  consumes: { energy: 40, data: 4 },
 
   combat: {
     fireChance: 1, // unused — pulse-driven
@@ -23,7 +23,7 @@ export const SHOCKWAVE_TOWER_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'shockwave_tower',
-    killCost: 500,
+    killCost: 75,
     tier: 5,
     shortDescription: 'AoE-Schockwelle alle 5 Ticks',
   },

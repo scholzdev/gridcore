@@ -14,6 +14,7 @@ export const MINER_CONFIG: BuildingConfig = {
   cost: { scrap: 40, energy: 10 },
   costIncrease: { scrap: 15, energy: 5 },
   income: { scrap: 25 },
+  consumes: { energy: 3 },
 
   order: 2,
 };

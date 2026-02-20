@@ -11,7 +11,7 @@ export const QUANTUM_FACTORY_CONFIG: BuildingConfig = {
   health: 3500,
   cost: { steel: 500, electronics: 400, data: 300 },
   costIncrease: { steel: 250, electronics: 200, data: 150 },
-  consumes: { energy: 50 },
+  consumes: { energy: 25 },
 
   income: {
     steel: 15,
@@ -21,7 +21,7 @@ export const QUANTUM_FACTORY_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'quantum_factory',
-    killCost: 500,
+    killCost: 75,
     tier: 5,
     shortDescription: 'Produziert Stahl + Elektronik + Daten',
   },

@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: gridcore
     hostname: gridcore
+    depends_on:
+      - gridcore-api
     networks:
       - internal
     restart: unless-stopped
@@ -13,6 +15,21 @@ services:
       - "subdomain=grind"
       - "traefik.http.routers.gridcore.entrypoints=websecure"
       - "traefik.http.services.gridcore.loadbalancer.server.port=80"
+
+  gridcore-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: gridcore-api
+    hostname: gridcore-api
+    volumes:
+      - leaderboard-data:/data
+    networks:
+      - internal
+    restart: unless-stopped
+
+volumes:
+  leaderboard-data:
 
 networks:
   internal:

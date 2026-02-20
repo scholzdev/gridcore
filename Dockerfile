@@ -12,7 +12,7 @@ RUN npm run build
 # ── Stage 2: Serve ────────────────────────────────────────────
 FROM nginx:alpine
 
-# SPA-Routing: alle Pfade → index.html
+# SPA-Routing: alle Pfade → index.html, /api → backend
 RUN printf 'server {\n\
     listen 80;\n\
     server_name _;\n\
@@ -21,6 +21,12 @@ RUN printf 'server {\n\
 \n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\
+    }\n\
+\n\
+    location /api/ {\n\
+        proxy_pass http://gridcore-api:3001;\n\
+        proxy_set_header Host $host;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
     }\n\
 \n\
     # Cache static assets\n\

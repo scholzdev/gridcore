@@ -11,7 +11,7 @@ export const DATA_VAULT_CONFIG: BuildingConfig = {
   health: 1500,
   cost: { steel: 300, electronics: 200, data: 150 },
   costIncrease: { steel: 150, electronics: 100, data: 75 },
-  consumes: { energy: 15 },
+  consumes: { energy: 8, data: 3 },
 
   support: {
     damageBuff: 0.15,
@@ -19,7 +19,7 @@ export const DATA_VAULT_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'vault',
-    killCost: 200,
+    killCost: 50,
     tier: 4,
     shortDescription: '+15% Geschützschaden global',
   },

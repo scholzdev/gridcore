@@ -16,7 +16,7 @@ export const LAB_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'lab',
-    killCost: 30,
+    killCost: 25,
     tier: 3,
     shortDescription: 'Energie+Elektronik → Daten',
   },

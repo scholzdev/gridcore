@@ -43,6 +43,7 @@ import { NANITE_DOME_CONFIG } from './buildings/nanite_dome';
 import { ANNIHILATOR_CONFIG } from './buildings/annihilator';
 import { HYPER_REACTOR_CONFIG } from './buildings/hyper_reactor';
 import { GRAVITY_CANNON_CONFIG } from './buildings/gravity_cannon';
+import { OVERDRIVE_TURRET_CONFIG } from './buildings/overdrive_turret';
 
 // ── Module Configs ───────────────────────────────────────────
 import { ATTACK_SPEED_CONFIG } from './modules/attack_speed';
@@ -56,6 +57,9 @@ import { REGEN_CONFIG } from './modules/regen';
 import { SLOW_HIT_CONFIG } from './modules/slow_hit';
 import { DOUBLE_YIELD_CONFIG } from './modules/double_yield';
 import { CRITICAL_HIT_CONFIG } from './modules/critical_hit';
+import { THORNS_CONFIG } from './modules/thorns';
+import { WALL_SLOW_CONFIG } from './modules/wall_slow';
+import { ABSORBER_CONFIG } from './modules/absorber';
 
 import type { BuildingConfig, ModuleConfig } from './types';
 import { TileType } from './types';
@@ -95,6 +99,7 @@ export const ALL_BUILDINGS: BuildingConfig[] = [
   ANNIHILATOR_CONFIG,
   HYPER_REACTOR_CONFIG,
   GRAVITY_CANNON_CONFIG,
+  OVERDRIVE_TURRET_CONFIG,
 ];
 
 // ── All Modules Array ────────────────────────────────────────
@@ -110,6 +115,9 @@ export const ALL_MODULES: ModuleConfig[] = [
   SLOW_HIT_CONFIG,
   DOUBLE_YIELD_CONFIG,
   CRITICAL_HIT_CONFIG,
+  THORNS_CONFIG,
+  WALL_SLOW_CONFIG,
+  ABSORBER_CONFIG,
 ];
 
 // ── Lookup Maps ──────────────────────────────────────────────
@@ -276,10 +284,10 @@ export const GUIDE_CATEGORIES = [
 
 // ── Utility ──────────────────────────────────────────────────
 export const scaleVals = (base: number) =>
-  [1, 1.5, 2, 2.5, 3].map(m => Math.round(base * m * 10) / 10).join(' / ');
+  [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25].map(m => Math.round(base * m * 10) / 10).join(' / ');
 
 /** Default level scaling: HP multiplier = 1 + (level-1) * LEVEL_SCALING */
-export const LEVEL_SCALING = 0.5;
+export const LEVEL_SCALING = 0.25;
 
 /** Get the effective max HP for a building at a given level */
 export function getMaxHP(type: number, level: number): number {

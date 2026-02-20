@@ -12,7 +12,7 @@ export const NANITE_DOME_CONFIG: BuildingConfig = {
   range: 100, // global
   cost: { steel: 550, electronics: 450, data: 350 },
   costIncrease: { steel: 275, electronics: 225, data: 175 },
-  consumes: { energy: 40 },
+  consumes: { energy: 20, data: 4 },
 
   support: {
     healPerTick: 30,
@@ -20,7 +20,7 @@ export const NANITE_DOME_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'nanite_dome',
-    killCost: 500,
+    killCost: 75,
     tier: 5,
     shortDescription: 'Globale Reparatur aller Gebäude',
   },

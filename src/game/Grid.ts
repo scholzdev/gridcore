@@ -5,6 +5,33 @@ export type { Building, ModuleDef } from '../config';
 
 import { TileType, ModuleType, BUILDING_STATS, BUILDING_REGISTRY, MODULE_DEFS, ORE_BUILDINGS, getMaxHP } from '../config';
 
+/** Mulberry32 seeded PRNG — returns a function that yields [0,1) */
+export function mulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Generate a random 6-char alphanumeric seed string */
+export function generateSeedString(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+  let s = '';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+/** Convert a seed string to a numeric hash */
+export function seedToNumber(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  }
+  return h;
+}
 
 export class GameGrid {
   size: number;
@@ -15,9 +42,12 @@ export class GameGrid {
   levels: number[][];
   coreX: number = -1;
   coreY: number = -1;
+  seed: string;
 
-  constructor(size: number = 30) {
+  constructor(size: number = 30, seed?: string) {
     this.size = size;
+    this.seed = seed || generateSeedString();
+    const rng = mulberry32(seedToNumber(this.seed));
     this.tiles = Array(size).fill(0).map(() => Array(size).fill(TileType.EMPTY));
     this.healths = Array(size).fill(0).map(() => Array(size).fill(0));
     this.shields = Array(size).fill(0).map(() => Array(size).fill(0));
@@ -25,8 +55,8 @@ export class GameGrid {
     this.levels = Array(size).fill(0).map(() => Array(size).fill(0));
     
     for (let i = 0; i < 40; i++) {
-      const x = Math.floor(Math.random() * size);
-      const y = Math.floor(Math.random() * size);
+      const x = Math.floor(rng() * size);
+      const y = Math.floor(rng() * size);
       this.tiles[y][x] = TileType.ORE_PATCH;
     }
   }
@@ -83,7 +113,7 @@ export class GameGrid {
   }
 
   upgradeBuilding(x: number, y: number): boolean {
-    if (this.levels[y][x] >= 5) return false; // Max Level 5
+    if (this.levels[y][x] >= 10) return false; // Max Level 10
     
     this.levels[y][x]++;
     const type = this.tiles[y][x];

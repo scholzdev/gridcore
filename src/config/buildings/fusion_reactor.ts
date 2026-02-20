@@ -9,13 +9,14 @@ export const FUSION_REACTOR_CONFIG: BuildingConfig = {
   category: 'infrastructure',
 
   health: 1200,
-  cost: { steel: 350, electronics: 200, data: 150 },
+  cost: { steel: 1000, electronics: 600, data: 500 },
   costIncrease: { steel: 150, electronics: 100, data: 75 },
-  income: { energy: 120 },
+  income: { energy: 75 },
+  consumes: { steel: 3, data: 1 },
 
   techTree: {
     id: 'fusion',
-    killCost: 30,
+    killCost: 25,
     tier: 3,
     shortDescription: 'Massive Energieproduktion',
   },

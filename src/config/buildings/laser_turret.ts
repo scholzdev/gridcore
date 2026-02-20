@@ -10,10 +10,10 @@ export const LASER_TURRET_CONFIG: BuildingConfig = {
 
   health: 1500,
   range: 8,
-  damage: 50,
-  cost: { steel: 200, electronics: 150 },
+  damage: 25,
+  cost: { steel: 400, electronics: 200 },
   costIncrease: { steel: 100, electronics: 75 },
-  consumes: { energy: 20 },
+  consumes: { energy: 25 },
 
   combat: {
     fireChance: 0.9,
@@ -24,7 +24,7 @@ export const LASER_TURRET_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'laser',
-    killCost: 30,
+    killCost: 25,
     tier: 3,
     shortDescription: 'Strahl mit Aufladung',
   },

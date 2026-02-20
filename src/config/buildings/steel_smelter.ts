@@ -12,7 +12,7 @@ export const STEEL_SMELTER_CONFIG: BuildingConfig = {
   health: 600,
   cost: { scrap: 60, energy: 20 },
   costIncrease: { scrap: 20, energy: 10 },
-  consumes: { energy: 12 },
+  consumes: { energy: 5 },
   income: { steel: 8 },
 
   techTree: {

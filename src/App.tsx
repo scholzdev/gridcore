@@ -17,8 +17,13 @@ import { MarketOverlay } from './components/MarketOverlay';
 import { ResearchOverlay } from './components/ResearchOverlay';
 import { GuideOverlay } from './components/GuideOverlay';
 import { MobileWarning } from './components/MobileWarning';
+import { LeaderboardOverlay } from './components/LeaderboardOverlay';
+import { AbilityBar } from './components/AbilityBar';
+import { playBuild, playSell, playUpgrade, playModuleInstall, isMuted, toggleMute } from './game/Sound';
 import type { MarketState } from './game/Market';
 import type { ResearchState } from './game/Research';
+import { createAbilityState } from './game/Abilities';
+import type { AbilityState } from './game/Abilities';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +43,7 @@ function App() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('leicht');
   const [gameMode, setGameMode] = useState<GameMode>('endlos');
+  const [gameSeed, setGameSeed] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
   const [showTechTree, setShowTechTree] = useState(false);
   const [killPoints, setKillPoints] = useState(0);
@@ -61,16 +67,21 @@ function App() {
   const [showMarket, setShowMarket] = useState(false);
   const [showResearch, setShowResearch] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [scoreSubmitted, setScoreSubmitted] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(isMuted);
   const [marketState, setMarketState] = useState<MarketState>({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
   const [researchState, setResearchState] = useState<ResearchState>({ levels: {} });
+  const [abilityState, setAbilityState] = useState<AbilityState>(() => createAbilityState());
 
   // ── Game Loop ──────────────────────────────────────────────
 
   useEffect(() => {
     if (!gameStarted || !canvasRef.current || engineRef.current) return;
-    engineRef.current = new GameEngine(canvasRef.current);
+    engineRef.current = new GameEngine(canvasRef.current, gameSeed || undefined);
     engineRef.current.setDifficulty(difficulty);
     engineRef.current.setGameMode(gameMode);
+    setGameSeed(engineRef.current.seed);
     setIsEngineReady(true);
 
     const loop = (t: number) => {
@@ -94,6 +105,10 @@ function App() {
       setGlobalStats({ ...engineRef.current.globalStats });
       setMarketState({ ...engineRef.current.market, prices: { ...engineRef.current.market.prices } });
       setResearchState({ ...engineRef.current.research, levels: { ...engineRef.current.research.levels } });
+      setAbilityState({
+        cooldowns: { ...engineRef.current.abilities.cooldowns },
+        active: { ...engineRef.current.abilities.active },
+      });
       if (engineRef.current.gameMode === 'wellen') {
         setWaveInfo({
           wave: engineRef.current.currentWave,
@@ -113,6 +128,13 @@ function App() {
     if (engineRef.current) engineRef.current.selectedPlacement = selectedBuilding;
   }, [selectedBuilding]);
 
+  // Auto-show leaderboard on game over
+  useEffect(() => {
+    if (isGameOver && !scoreSubmitted) {
+      setShowLeaderboard(true);
+    }
+  }, [isGameOver]);
+
   // ── Keyboard ───────────────────────────────────────────────
 
   useEffect(() => {
@@ -124,12 +146,22 @@ function App() {
       if (e.key === 'm' || e.key === 'M') setShowMarket(prev => !prev);
       if (e.key === 'f' || e.key === 'F') setShowResearch(prev => !prev);
       if (e.key === 'h' || e.key === 'H') setShowGuide(prev => !prev);
+      if (e.key === 'l' || e.key === 'L') setShowLeaderboard(prev => !prev);
+      // Ability hotkeys
+      if (e.key === 'q' || e.key === 'Q') handleUseAbility('overcharge');
+      if (e.key === 'w' || e.key === 'W') handleUseAbility('emergency_repair');
+      if (e.key === 'e' || e.key === 'E') handleUseAbility('emp_blast');
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // ── Handlers ───────────────────────────────────────────────
+
+  const handleUseAbility = (id: string) => {
+    if (!engineRef.current || engineRef.current.gameOver || engineRef.current.paused) return;
+    engineRef.current.useAbility(id);
+  };
 
   const togglePause = () => {
     if (engineRef.current && !engineRef.current.gameOver) {
@@ -151,6 +183,7 @@ function App() {
     setIsGameOver(false);
     setGameStarted(false);
     setShowTechTree(false);
+    setGameSeed('');
     setKillPoints(0);
     setUnlockedBuildings(() => {
       try {
@@ -167,8 +200,11 @@ function App() {
     setSelectedModule(ModuleType.NONE);
     setShowMarket(false);
     setShowResearch(false);
+    setShowLeaderboard(false);
+    setScoreSubmitted(false);
     setMarketState({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
     setResearchState({ levels: {} });
+    setAbilityState(createAbilityState());
   };
 
   const handleUnlock = (node: TechNode) => {
@@ -316,6 +352,7 @@ function App() {
       if (modDef && engineRef.current.resources.canAfford(modDef.cost)) {
         if (engineRef.current.grid.installModule(worldX, worldY, selectedModule)) {
           engineRef.current.resources.spend(modDef.cost);
+          playModuleInstall();
           setResources({ ...engineRef.current.resources.state });
         }
       }
@@ -328,6 +365,7 @@ function App() {
       if (upgradeCost && engineRef.current.resources.canAfford(upgradeCost)) {
         if (engineRef.current.grid.upgradeBuilding(worldX, worldY)) {
           engineRef.current.resources.spend(upgradeCost);
+          playUpgrade();
           setResources({ ...engineRef.current.resources.state });
         }
       }
@@ -338,6 +376,7 @@ function App() {
           engineRef.current.resources.spend(cost);
           engineRef.current.purchasedCounts[selectedBuilding] = (engineRef.current.purchasedCounts[selectedBuilding] || 0) + 1;
           engineRef.current.buildingsPlaced++;
+          playBuild();
           setResources({ ...engineRef.current.resources.state });
         }
       }
@@ -360,6 +399,7 @@ function App() {
     if (removedLevel > 0) {
       engineRef.current.resources.add(refund);
       if (engineRef.current.purchasedCounts[type] > 0) engineRef.current.purchasedCounts[type]--;
+      playSell();
       setResources({ ...engineRef.current.resources.state });
     }
   };
@@ -400,6 +440,8 @@ function App() {
         setGameMode={setGameMode}
         setDifficulty={setDifficulty}
         setGameStarted={setGameStarted}
+        seed={gameSeed}
+        setSeed={setGameSeed}
       />
     );
   }
@@ -455,6 +497,21 @@ function App() {
       {showGuide && (
         <GuideOverlay onClose={() => setShowGuide(false)} />
       )}
+      {showLeaderboard && (
+        <LeaderboardOverlay
+          onClose={() => setShowLeaderboard(false)}
+          showSubmit={isGameOver && !scoreSubmitted}
+          submitData={isGameOver ? {
+            wave: waveInfo.wave,
+            kills: gameStats.killed,
+            time_s: gameStats.time,
+            difficulty,
+            game_mode: gameMode,
+            damage: globalStats.totalDamage,
+            seed: gameSeed,
+          } : undefined}
+        />
+      )}
 
       <TopBar
         paused={paused}
@@ -476,10 +533,24 @@ function App() {
         onToggleMarket={() => setShowMarket(prev => !prev)}
         onToggleResearch={() => setShowResearch(prev => !prev)}
         onToggleGuide={() => setShowGuide(prev => !prev)}
+        onToggleLeaderboard={() => setShowLeaderboard(prev => !prev)}
+        onToggleMute={() => setSoundMuted(toggleMute())}
+        isMuted={soundMuted}
         onSave={handleSave}
         onLoad={handleLoad}
         hasSave={hasSave}
+        seed={gameSeed}
       />
+
+      {!placingCore && (
+        <AbilityBar
+          abilities={abilityState}
+          resources={resources}
+          onUse={handleUseAbility}
+          paused={paused}
+          isGameOver={isGameOver}
+        />
+      )}
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {!placingCore && <BuildSidebar

@@ -13,7 +13,7 @@ export const DRONE_HANGAR_CONFIG: BuildingConfig = {
   damage: 45,
   cost: { steel: 250, electronics: 200, data: 50 },
   costIncrease: { steel: 125, electronics: 100, data: 25 },
-  consumes: { energy: 25 },
+  consumes: { energy: 12, data: 2 },
 
   combat: {
     projectileSpeed: 0.5,
@@ -27,7 +27,7 @@ export const DRONE_HANGAR_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'drones',
-    killCost: 200,
+    killCost: 50,
     tier: 4,
     shortDescription: 'Autonome Angriffsdrohnen',
   },

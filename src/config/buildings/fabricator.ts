@@ -11,7 +11,7 @@ export const FABRICATOR_CONFIG: BuildingConfig = {
   health: 1000,
   cost: { scrap: 200, energy: 100 },
   costIncrease: { scrap: 70, energy: 50 },
-  consumes: { energy: 20 },
+  consumes: { energy: 10 },
   income: { electronics: 8 },
 
   techTree: {

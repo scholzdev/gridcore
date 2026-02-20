@@ -42,6 +42,7 @@ export const BuildSidebar = ({
         <BuildBtn type={TileType.ION_CANNON} selected={sel} set={set} label="Ionenkanone" cost={getCostString(TileType.ION_CANNON)} color="#00b4d8" affordable={canAffordBuilding(TileType.ION_CANNON)} locked={!unlockedBuildings.has(TileType.ION_CANNON)} />
         <BuildBtn type={TileType.SHOCKWAVE_TOWER} selected={sel} set={set} label="Schockwellen-Turm" cost={getCostString(TileType.SHOCKWAVE_TOWER)} color="#e63946" affordable={canAffordBuilding(TileType.SHOCKWAVE_TOWER)} locked={!unlockedBuildings.has(TileType.SHOCKWAVE_TOWER)} />
         <BuildBtn type={TileType.ANNIHILATOR} selected={sel} set={set} label="Annihilator" cost={getCostString(TileType.ANNIHILATOR)} color="#ff006e" affordable={canAffordBuilding(TileType.ANNIHILATOR)} locked={!unlockedBuildings.has(TileType.ANNIHILATOR)} />
+        <BuildBtn type={TileType.OVERDRIVE_TURRET} selected={sel} set={set} label="Overdrivegeschütz" cost={getCostString(TileType.OVERDRIVE_TURRET)} color="#e63946" affordable={canAffordBuilding(TileType.OVERDRIVE_TURRET)} locked={!unlockedBuildings.has(TileType.OVERDRIVE_TURRET)} />
       </BuildGroup>
       <BuildGroup label="Unterstützung">
         <BuildBtn type={TileType.SLOW_FIELD} selected={sel} set={set} label="EMP-Feld" cost={getCostString(TileType.SLOW_FIELD)} color="#a29bfe" affordable={canAffordBuilding(TileType.SLOW_FIELD)} locked={!unlockedBuildings.has(TileType.SLOW_FIELD)} />

@@ -13,7 +13,7 @@ export const ION_CANNON_CONFIG: BuildingConfig = {
   damage: 120,
   cost: { steel: 700, electronics: 500, data: 350 },
   costIncrease: { steel: 350, electronics: 250, data: 175 },
-  consumes: { energy: 70 },
+  consumes: { energy: 35, data: 3 },
 
   combat: {
     fireChance: 0.85,
@@ -24,7 +24,7 @@ export const ION_CANNON_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'ion_cannon',
-    killCost: 500,
+    killCost: 75,
     tier: 5,
     shortDescription: 'Strahl mit 5× Aufladung',
   },

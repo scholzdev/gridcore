@@ -12,7 +12,7 @@ export const GRAVITY_CANNON_CONFIG: BuildingConfig = {
   range: 12,
   cost: { steel: 1100, electronics: 850, data: 650 },
   costIncrease: { steel: 550, electronics: 425, data: 325 },
-  consumes: { energy: 90 },
+  consumes: { energy: 45, data: 5 },
 
   support: {
     gravityPull: 0.03,

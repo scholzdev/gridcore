@@ -12,7 +12,7 @@ export const RADAR_STATION_CONFIG: BuildingConfig = {
   range: 5,
   cost: { steel: 80, electronics: 40 },
   costIncrease: { steel: 30, electronics: 20 },
-  consumes: { energy: 10 },
+  consumes: { energy: 12 },
 
   support: {
     radarRangeBuffBase: 3,
@@ -21,7 +21,7 @@ export const RADAR_STATION_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'radar',
-    killCost: 30,
+    killCost: 25,
     tier: 3,
     shortDescription: 'Erhöht Geschützreichweite',
   },

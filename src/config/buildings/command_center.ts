@@ -12,7 +12,7 @@ export const COMMAND_CENTER_CONFIG: BuildingConfig = {
   range: 100, // global
   cost: { steel: 600, electronics: 500, data: 300 },
   costIncrease: { steel: 300, electronics: 250, data: 150 },
-  consumes: { energy: 60 },
+  consumes: { energy: 30, data: 5 },
 
   support: {
     damageBuff: 0.15,
@@ -23,7 +23,7 @@ export const COMMAND_CENTER_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'command_center',
-    killCost: 500,
+    killCost: 75,
     tier: 5,
     shortDescription: 'Globaler Schaden- & Feuerrate-Buff',
   },

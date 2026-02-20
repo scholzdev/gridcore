@@ -13,7 +13,7 @@ export const PLASMA_CANNON_CONFIG: BuildingConfig = {
   damage: 300,
   cost: { steel: 500, electronics: 400, data: 200 },
   costIncrease: { steel: 300, electronics: 200, data: 100 },
-  consumes: { energy: 30 },
+  consumes: { energy: 15 },
 
   combat: {
     fireChance: 0.9,
@@ -25,7 +25,7 @@ export const PLASMA_CANNON_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'plasma',
-    killCost: 200,
+    killCost: 50,
     tier: 4,
     shortDescription: 'Massiver Flächenschaden',
   },

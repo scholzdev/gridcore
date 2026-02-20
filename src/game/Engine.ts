@@ -1,9 +1,10 @@
 import { GameGrid } from './Grid';
-import { TileType, BUILDING_STATS, BUILDING_REGISTRY, getMaxHP, getLevelMult } from '../config';
+import { TileType, BUILDING_STATS, BUILDING_REGISTRY, getMaxHP, getLevelMult, ORE_BUILDINGS } from '../config';
 import { ResourceManager } from './Resources';
 import { Renderer } from './Renderer';
 import { detonateMines, moveEnemies, turretLogic, updateProjectiles, updateParticles, updateDrones } from './Combat';
 import { loadUnlocks, saveUnlocks, resetUnlocks as resetUnlocksStorage, STARTER_BUILDINGS } from './TechTree';
+import { mulberry32, seedToNumber } from './Grid';
 import { loadPrestige, savePrestige, calcPrestigeEarned } from './Prestige';
 import type { PrestigeData } from './Prestige';
 import { createMarketState, tickMarketPrices, executeTrade, TRADE_ROUTES } from './Market';
@@ -12,10 +13,13 @@ import { createResearchState, computeResearchBuffs, getResearchLevel, getResearc
 import type { ResearchState, ResearchBuffs } from './Research';
 import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
 import { createMapEventState, tickMapEvents, updateEventNotifications } from './MapEvents';
+import { playWaveStart } from './Sound';
 import type { MapEventState } from './MapEvents';
+import { createAbilityState, tickAbilities, activateAbility, isAbilityActive, ABILITIES } from './Abilities';
+import type { AbilityState } from './Abilities';
 import { DIFFICULTY_PRESETS, WAVE_CONFIG } from './types';
 import type { TechNode } from './TechTree';
-import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech } from './HookSystem';
+import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed } from './HookSystem';
 
 export class GameEngine {
   grid: GameGrid;
@@ -55,6 +59,9 @@ export class GameEngine {
   mapEvents: MapEventState;
   solarStormMult: number = 1;
 
+  // Active Abilities
+  abilities: AbilityState;
+
   lastTick: number = 0;
   tickRate: number = 1000;
   gameOver: boolean = false;
@@ -90,10 +97,16 @@ export class GameEngine {
 
   purchasedCounts: Record<number, number> = {};
   canvas: HTMLCanvasElement;
+  seed: string = '';
+  spawnRng: () => number = Math.random;
+  private spawnCounter: number = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, seed?: string) {
     this.canvas = canvas;
-    this.grid = new GameGrid(30);
+    this.grid = new GameGrid(30, seed);
+    this.seed = this.grid.seed;
+    // Separate RNG stream for spawns (offset from map RNG)
+    this.spawnRng = mulberry32(seedToNumber(this.seed) + 7919);
     this.resources = new ResourceManager();
     this.renderer = new Renderer(canvas);
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
@@ -102,7 +115,8 @@ export class GameEngine {
     this.market = createMarketState();
     this.research = createResearchState();
     this.researchBuffs = computeResearchBuffs(this.research);
-    this.mapEvents = createMapEventState();
+    this.mapEvents = createMapEventState(() => this.spawnRng());
+    this.abilities = createAbilityState();
     this.applyPrestigeStartBonuses();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -127,12 +141,13 @@ export class GameEngine {
 
   startNextWave() {
     this.currentWave++;
-    this.waveEnemiesTotal = WAVE_CONFIG.enemiesBase + this.currentWave * WAVE_CONFIG.enemiesPerWave;
+    this.waveEnemiesTotal = Math.floor(WAVE_CONFIG.enemiesBase * Math.pow(WAVE_CONFIG.enemiesGrowth, this.currentWave - 1));
     this.waveEnemiesSpawned = 0;
     this.waveEnemiesKilledThisWave = 0;
     this.waveBuildPhase = false;
     this.waveActive = true;
     this.waveSpawnTimer = 0;
+    playWaveStart();
     fireOnWaveStart(this, this.currentWave, this.waveEnemiesTotal);
   }
 
@@ -146,8 +161,11 @@ export class GameEngine {
     return true;
   }
 
-  restart() {
-    this.grid = new GameGrid(30);
+  restart(seed?: string) {
+    this.grid = new GameGrid(30, seed);
+    this.seed = this.grid.seed;
+    this.spawnRng = mulberry32(seedToNumber(this.seed) + 7919);
+    this.spawnCounter = 0;
     this.resources = new ResourceManager();
     this.enemies = [];
     this.projectiles = [];
@@ -185,8 +203,9 @@ export class GameEngine {
     this.research = createResearchState();
     this.researchBuffs = computeResearchBuffs(this.research);
     this.placingCore = true;
-    this.mapEvents = createMapEventState();
+    this.mapEvents = createMapEventState(() => this.spawnRng());
     this.solarStormMult = 1;
+    this.abilities = createAbilityState();
     this.applyPrestigeStartBonuses();
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
   }
@@ -349,40 +368,46 @@ export class GameEngine {
     const stats = BUILDING_STATS[type];
     if (!stats || !stats.cost) return { scrap: 0 };
     const count = this.purchasedCounts[type] || 0;
-    const inc = stats.costIncrease || {};
     const cm = this.prestigeCostMult * this.researchBuffs.costMult;
+    // Exponential scaling: base * 1.15^count
+    const expMult = Math.pow(1.15, count);
     return {
-      energy: Math.floor(((stats.cost.energy || 0) + (inc.energy || 0) * count) * cm),
-      scrap: Math.floor(((stats.cost.scrap || 0) + (inc.scrap || 0) * count) * cm),
-      steel: Math.floor(((stats.cost.steel || 0) + (inc.steel || 0) * count) * cm),
-      electronics: Math.floor(((stats.cost.electronics || 0) + (inc.electronics || 0) * count) * cm),
-      data: Math.floor(((stats.cost.data || 0) + (inc.data || 0) * count) * cm),
+      energy: Math.floor((stats.cost.energy || 0) * expMult * cm),
+      scrap: Math.floor((stats.cost.scrap || 0) * expMult * cm),
+      steel: Math.floor((stats.cost.steel || 0) * expMult * cm),
+      electronics: Math.floor((stats.cost.electronics || 0) * expMult * cm),
+      data: Math.floor((stats.cost.data || 0) * expMult * cm),
     };
   }
 
   getUpgradeCost(type: number, currentLevel: number) {
     const stats = BUILDING_STATS[type];
     if (!stats || !stats.cost) return null;
-    const factor = currentLevel;
+    // Exponential upgrade cost: base * 1.5 * 2.5^(level-1) — always more expensive than placing new
+    const factor = 1.5 * Math.pow(2.5, currentLevel - 1);
+    const cm = this.prestigeCostMult * this.researchBuffs.costMult;
     return {
-      energy: (stats.cost.energy || 0) * factor,
-      scrap: (stats.cost.scrap || 0) * factor,
-      steel: (stats.cost.steel || 0) * factor,
-      electronics: (stats.cost.electronics || 0) * factor,
-      data: (stats.cost.data || 0) * factor,
+      energy: Math.floor((stats.cost.energy || 0) * factor * cm),
+      scrap: Math.floor((stats.cost.scrap || 0) * factor * cm),
+      steel: Math.floor((stats.cost.steel || 0) * factor * cm),
+      electronics: Math.floor((stats.cost.electronics || 0) * factor * cm),
+      data: Math.floor((stats.cost.data || 0) * factor * cm),
     };
   }
 
   getRefund(type: number, level: number) {
     const stats = BUILDING_STATS[type];
     if (!stats || !stats.cost) return { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
-    const totalFactor = level;
+    // Refund ~40% of total invested (sum of exponential costs)
+    let totalFactor = 0;
+    for (let l = 1; l < level; l++) totalFactor += Math.pow(2.5, l - 1);
+    totalFactor += 1; // base purchase
     return {
-      energy: Math.floor((stats.cost.energy || 0) * totalFactor * 0.5),
-      scrap: Math.floor((stats.cost.scrap || 0) * totalFactor * 0.5),
-      steel: Math.floor((stats.cost.steel || 0) * totalFactor * 0.5),
-      electronics: Math.floor((stats.cost.electronics || 0) * totalFactor * 0.5),
-      data: Math.floor((stats.cost.data || 0) * totalFactor * 0.5),
+      energy: Math.floor((stats.cost.energy || 0) * totalFactor * 0.4),
+      scrap: Math.floor((stats.cost.scrap || 0) * totalFactor * 0.4),
+      steel: Math.floor((stats.cost.steel || 0) * totalFactor * 0.4),
+      electronics: Math.floor((stats.cost.electronics || 0) * totalFactor * 0.4),
+      data: Math.floor((stats.cost.data || 0) * totalFactor * 0.4),
     };
   }
 
@@ -477,6 +502,12 @@ export class GameEngine {
     const tickIncome = { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
     const tickExpense = { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
 
+    // Count solar panels for diminishing returns
+    let solarCount = 0;
+    for (let sy = 0; sy < size; sy++)
+      for (let sx = 0; sx < size; sx++)
+        if (this.grid.tiles[sy][sx] === TileType.SOLAR_PANEL) solarCount++;
+
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const type = this.grid.tiles[y][x];
@@ -489,7 +520,7 @@ export class GameEngine {
         // Fire onTick hook BEFORE consumes — hooks may modify consumeMult & healAmount
         const tickEvent = fireOnTick(this, x, y, this.gameTime);
 
-        // Consumes
+        // Consumes (flat — NOT scaled with level, so upgrades don't punish)
         if (stats.consumes) {
           const consumes = { ...stats.consumes };
           // Apply hook-driven consume multiplier (e.g. Efficiency module sets consumeMult = 0.5)
@@ -508,10 +539,29 @@ export class GameEngine {
         }
         this.activeTiles[y][x] = true;
 
+        // Maintenance cost: every building costs scrap per tick based on level
+        if (type !== TileType.CORE) {
+          const maintenance = Math.floor(level * 0.5);
+          if (maintenance > 0) {
+            this.resources.spend({ scrap: maintenance });
+            tickExpense.scrap += maintenance;
+          }
+        }
+
         // Apply heal from onTick hooks (e.g. Regen module)
         if (tickEvent.healAmount > 0) {
           const maxHP = getMaxHP(type, level);
           this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + tickEvent.healAmount);
+        }
+
+        // Check for self-destruction (e.g. Overdrive Turret losing HP from its own hook)
+        if (this.grid.healths[y][x] <= 0) {
+          fireOnDestroyed(this, x, y, type);
+          this.grid.tiles[y][x] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
+          this.grid.levels[y][x] = 0;
+          this.grid.shields[y][x] = 0;
+          this.grid.modules[y][x] = 0;
+          continue;
         }
 
         // Income
@@ -528,6 +578,11 @@ export class GameEngine {
           // Solar storm event: 3× energy for solar panels
           if (income.energy && type === TileType.SOLAR_PANEL) {
             income.energy *= this.solarStormMult;
+            // Diminishing returns: first 15 full output, then -5% per extra (min 30%)
+            if (solarCount > 15) {
+              const penalty = Math.max(0.3, 1 - (solarCount - 15) * 0.05);
+              income.energy *= penalty;
+            }
           }
 
           // Fire onResourceGained — hooks can modify incomeMult (Overcharge, DoubleYield, Lab dataOutputMult)
@@ -607,6 +662,13 @@ export class GameEngine {
 
     // Market price recovery
     tickMarketPrices(this.market);
+
+    // Tick ability cooldowns & durations
+    tickAbilities(this.abilities);
+
+    // Emergency Repair: instant heal when activated (handled in useAbility)
+    // EMP Blast: stun applied when activated (handled in useAbility)
+    // Overcharge: fire rate boost checked in Combat.ts
   }
 
   // ── Market ─────────────────────────────────────────────────
@@ -630,35 +692,80 @@ export class GameEngine {
     return true;
   }
 
+  // ── Active Abilities ───────────────────────────────────────
+
+  useAbility(abilityId: string): boolean {
+    const ok = activateAbility(
+      this.abilities, abilityId,
+      (cost) => this.resources.canAfford(cost),
+      (cost) => this.resources.spend(cost),
+    );
+    if (!ok) return false;
+
+    // Instant effects
+    if (abilityId === 'emergency_repair') {
+      const size = this.grid.size;
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const type = this.grid.tiles[y][x];
+          if (type === TileType.EMPTY || type === TileType.ORE_PATCH) continue;
+          const level = this.grid.levels[y][x] || 1;
+          const maxHP = getMaxHP(type, level);
+          const heal = maxHP * 0.5;
+          this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + heal);
+          this.addDamageNumber(x + 0.5, y + 0.3, Math.round(heal), '#27ae60');
+        }
+      }
+    }
+
+    if (abilityId === 'emp_blast') {
+      const stunDuration = 5000; // 5 seconds
+      const now = Date.now();
+      for (const enemy of this.enemies) {
+        enemy.slowedUntil = now + stunDuration;
+        enemy.slowFactor = 0; // full stop
+      }
+    }
+
+    return true;
+  }
+
   // ── Spawning ───────────────────────────────────────────────
 
   spawnEnemy() {
     const s = this.grid.size;
     const edge = s - 1;
-    const side = Math.floor(Math.random() * 4);
+    const rng = this.spawnRng;
+    const side = Math.floor(rng() * 4);
     let x = 0, y = 0;
-    if (side === 0) { x = Math.random() * s; y = 0; }
-    if (side === 1) { x = edge; y = Math.random() * s; }
-    if (side === 2) { x = Math.random() * s; y = edge; }
-    if (side === 3) { x = 0; y = Math.random() * s; }
-    const hp = this.diffConfig.baseHp + (this.gameTime * this.diffConfig.hpPerSec);
-    const speed = this.diffConfig.baseSpeed + (this.gameTime * this.diffConfig.speedPerSec);
-    this.enemies.push({ id: Math.random().toString(36), x, y, health: hp, maxHealth: hp, speed, lastHit: 0 });
+    if (side === 0) { x = rng() * s; y = 0; }
+    if (side === 1) { x = edge; y = rng() * s; }
+    if (side === 2) { x = rng() * s; y = edge; }
+    if (side === 3) { x = 0; y = rng() * s; }
+    // Exponential scaling: HP doubles roughly every 3 minutes, speed every 5 min
+    const minutes = this.gameTime / 60;
+    const hp = this.diffConfig.baseHp * Math.pow(1 + this.diffConfig.hpPerSec * 0.08, minutes * 10);
+    const speed = Math.min(0.12, this.diffConfig.baseSpeed * Math.pow(1 + this.diffConfig.speedPerSec * 2, minutes * 10));
+    this.spawnCounter++;
+    this.enemies.push({ id: `e${this.spawnCounter}`, x, y, health: hp, maxHealth: hp, speed, lastHit: 0 });
   }
 
   spawnWaveEnemy() {
     const s = this.grid.size;
     const edge = s - 1;
-    const side = Math.floor(Math.random() * 4);
+    const rng = this.spawnRng;
+    const side = Math.floor(rng() * 4);
     let x = 0, y = 0;
-    if (side === 0) { x = Math.random() * s; y = 0; }
-    if (side === 1) { x = edge; y = Math.random() * s; }
-    if (side === 2) { x = Math.random() * s; y = edge; }
-    if (side === 3) { x = 0; y = Math.random() * s; }
+    if (side === 0) { x = rng() * s; y = 0; }
+    if (side === 1) { x = edge; y = rng() * s; }
+    if (side === 2) { x = rng() * s; y = edge; }
+    if (side === 3) { x = 0; y = rng() * s; }
     const wave = this.currentWave;
-    const hp = this.diffConfig.baseHp * (1 + (wave - 1) * WAVE_CONFIG.hpScalingPerWave);
-    const speed = this.diffConfig.baseSpeed * (1 + (wave - 1) * WAVE_CONFIG.speedScalingPerWave);
-    this.enemies.push({ id: Math.random().toString(36), x, y, health: hp, maxHealth: hp, speed, lastHit: 0 });
+    // Exponential wave scaling
+    const hp = this.diffConfig.baseHp * Math.pow(1 + WAVE_CONFIG.hpScalingPerWave, wave - 1);
+    const speed = Math.min(0.12, this.diffConfig.baseSpeed * Math.pow(1 + WAVE_CONFIG.speedScalingPerWave, wave - 1));
+    this.spawnCounter++;
+    this.enemies.push({ id: `e${this.spawnCounter}`, x, y, health: hp, maxHealth: hp, speed, lastHit: 0 });
   }
 
   onWaveEnemyKilled() {

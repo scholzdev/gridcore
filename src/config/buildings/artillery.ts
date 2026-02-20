@@ -13,7 +13,7 @@ export const ARTILLERY_CONFIG: BuildingConfig = {
   damage: 500,
   cost: { steel: 800, electronics: 600, data: 400 },
   costIncrease: { steel: 400, electronics: 300, data: 200 },
-  consumes: { energy: 50 },
+  consumes: { energy: 25 },
 
   combat: {
     fireChance: 0.97, // only 3% chance per tick — very slow
@@ -25,7 +25,7 @@ export const ARTILLERY_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'artillery',
-    killCost: 500,
+    killCost: 75,
     tier: 5,
     shortDescription: 'Globale Reichweite, massiver AoE',
   },

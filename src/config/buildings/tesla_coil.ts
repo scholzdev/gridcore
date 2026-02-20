@@ -10,10 +10,10 @@ export const TESLA_COIL_CONFIG: BuildingConfig = {
 
   health: 1200,
   range: 5,
-  damage: 40,
+  damage: 10,
   cost: { steel: 120, scrap: 80 },
   costIncrease: { steel: 60, scrap: 30 },
-  consumes: { energy: 15 },
+  consumes: { energy: 8 },
 
   combat: {
     fireChance: 0.9,

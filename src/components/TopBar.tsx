@@ -29,15 +29,19 @@ interface TopBarProps {
   onToggleMarket: () => void;
   onToggleResearch: () => void;
   onToggleGuide: () => void;
+  onToggleLeaderboard: () => void;
+  onToggleMute: () => void;
+  isMuted: boolean;
   onSave: () => void;
   onLoad: () => void;
   hasSave: boolean;
+  seed: string;
 }
 
 export const TopBar = ({
   paused, isGameOver, difficulty, gameMode, gameStats, coreHealth, resources, netIncome,
   killPoints, showTechTree, waveInfo, onTogglePause, onRestart, onToggleTechTree,
-  onTogglePrestige, onToggleStats, onToggleMarket, onToggleResearch, onToggleGuide, onSave, onLoad, hasSave
+  onTogglePrestige, onToggleStats, onToggleMarket, onToggleResearch, onToggleGuide, onToggleLeaderboard, onToggleMute, isMuted, onSave, onLoad, hasSave, seed
 }: TopBarProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -78,6 +82,10 @@ export const TopBar = ({
       }}>{DIFFICULTY_PRESETS[difficulty].label}</div>
 
       <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatTime(gameStats.time)}</div>
+      {seed && <div style={{ fontSize: '10px', color: '#b2bec3', fontFamily: 'monospace', cursor: 'pointer' }}
+        title="Seed kopieren"
+        onClick={() => navigator.clipboard?.writeText(seed)}
+      >🌱 {seed}</div>}
       <div style={{ color: '#e84118', fontWeight: 'bold', fontSize: '14px' }}>BESIEGT: {gameStats.killed}</div>
 
       {gameMode === 'wellen' && (
@@ -130,6 +138,16 @@ export const TopBar = ({
         padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
         backgroundColor: '#636e72', color: '#fff', border: 'none'
       }}>📖 GUIDE</button>
+
+      <button onClick={onToggleLeaderboard} style={{
+        padding: '4px 12px', cursor: 'pointer', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: '#d35400', color: '#fff', border: 'none'
+      }}>🏆 RANGLISTE</button>
+
+      <button onClick={onToggleMute} style={{
+        padding: '4px 8px', cursor: 'pointer', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', fontFamily: 'monospace',
+        backgroundColor: isMuted ? '#636e72' : '#2d3436', color: '#fff', border: 'none'
+      }}>{isMuted ? '🔇' : '🔊'}</button>
 
       <div style={{ fontSize: '14px' }}>KERN: <span style={{ color: coreHealth.current < coreHealth.max * 0.3 ? '#e74c3c' : '#2d3436', fontWeight: 'bold' }}>{Math.max(0, Math.floor(coreHealth.current))}</span></div>
       <div style={{ width: '1px', height: '20px', backgroundColor: '#dfe4ea' }} />

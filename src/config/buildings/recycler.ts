@@ -11,12 +11,12 @@ export const RECYCLER_CONFIG: BuildingConfig = {
   health: 1200,
   cost: { steel: 250, electronics: 150, data: 80 },
   costIncrease: { steel: 100, electronics: 75, data: 40 },
-  consumes: { energy: 25 },
+  consumes: { energy: 12 },
   income: { steel: 10, electronics: 8 },
 
   techTree: {
     id: 'recycler',
-    killCost: 30,
+    killCost: 25,
     tier: 3,
     shortDescription: 'Stahl+Elektronik aus Schrott',
   },

@@ -12,7 +12,7 @@ export const SOLAR_PANEL_CONFIG: BuildingConfig = {
   health: 400,
   cost: { scrap: 40 },
   costIncrease: { scrap: 10 },
-  income: { energy: 25 },
+  income: { energy: 10 },
 
   order: 1,
 };

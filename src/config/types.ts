@@ -35,6 +35,7 @@ export enum TileType {
   ANNIHILATOR = 32,
   HYPER_REACTOR = 33,
   GRAVITY_CANNON = 34,
+  OVERDRIVE_TURRET = 35,
 }
 
 // ── Module Types ─────────────────────────────────────────────
@@ -51,6 +52,9 @@ export enum ModuleType {
   SLOW_HIT = 9,
   DOUBLE_YIELD = 10,
   CRITICAL_HIT = 11,
+  THORNS = 12,
+  WALL_SLOW = 13,
+  ABSORBER = 14,
 }
 
 // ── Resource Cost ────────────────────────────────────────────
