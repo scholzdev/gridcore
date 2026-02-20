@@ -1,7 +1,7 @@
 import { GameGrid } from './Grid';
 import { TileType, BUILDING_STATS, BUILDING_REGISTRY, getMaxHP, getLevelMult, ORE_BUILDINGS } from '../config';
 import {
-  GRID_SIZE, TICK_RATE_MS, DEFAULT_ZOOM, MAX_GAME_SPEED, SPAWN_RNG_OFFSET,
+  GRID_SIZE, TICK_RATE_MS, DEFAULT_ZOOM, SPAWN_RNG_OFFSET,
   REFUND_PERCENTAGE, COST_SCALING_BASE, UPGRADE_COST_BASE_MULT, UPGRADE_COST_SCALING_BASE,
   MAINTENANCE_COST_PER_LEVEL, SOLAR_DIMINISHING_THRESHOLD, SOLAR_DIMINISHING_PENALTY,
   SOLAR_MIN_EFFICIENCY, DAMAGE_NUMBER_LIFETIME, DAMAGE_NUMBER_DRIFT_SPEED,
@@ -23,11 +23,11 @@ import { createMarketState, tickMarketPrices, executeTrade, TRADE_ROUTES } from 
 import type { MarketState } from './Market';
 import { createResearchState, computeResearchBuffs, getResearchLevel, getResearchCost, canResearch, RESEARCH_NODES } from './Research';
 import type { ResearchState, ResearchBuffs } from './Research';
-import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats, EnemyType } from './types';
+import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
 import { createMapEventState, tickMapEvents, updateEventNotifications } from './MapEvents';
 import { playWaveStart } from './Sound';
 import type { MapEventState } from './MapEvents';
-import { createAbilityState, tickAbilities, activateAbility, isAbilityActive, ABILITIES } from './Abilities';
+import { createAbilityState, tickAbilities, activateAbility } from './Abilities';
 import type { AbilityState } from './Abilities';
 import { DIFFICULTY_PRESETS, WAVE_CONFIG, ENEMY_TYPES, getWaveComposition, pickEnemyType, getEndlessEnemyType } from './types';
 import type { TechNode } from './TechTree';

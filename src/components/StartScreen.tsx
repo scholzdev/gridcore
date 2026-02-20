@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { DIFFICULTY_PRESETS } from '../game/types';
 import type { Difficulty, GameMode } from '../game/types';
 import { hasTutorialBeenCompleted } from '../game/Tutorial';
