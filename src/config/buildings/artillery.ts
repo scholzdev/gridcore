@@ -25,7 +25,7 @@ export const ARTILLERY_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'artillery',
-    killCost: 80,
+    killCost: 500,
     tier: 5,
     shortDescription: 'Globale Reichweite, massiver AoE',
   },

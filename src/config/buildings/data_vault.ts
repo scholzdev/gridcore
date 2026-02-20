@@ -19,7 +19,7 @@ export const DATA_VAULT_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'vault',
-    killCost: 50,
+    killCost: 200,
     tier: 4,
     shortDescription: '+15% Geschützschaden global',
   },

@@ -51,7 +51,7 @@ function App() {
     } catch {}
     return new Set(STARTER_BUILDINGS);
   });
-  const [waveInfo, setWaveInfo] = useState({ wave: 0, buildPhase: true, buildTimer: 20, enemiesLeft: 0, enemiesTotal: 0 });
+  const [waveInfo, setWaveInfo] = useState({ wave: 0, buildPhase: true, buildTimer: 30, enemiesLeft: 0, enemiesTotal: 0 });
   const [showPrestige, setShowPrestige] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [prestigeData, setPrestigeData] = useState<PrestigeData>(() => loadPrestige());
@@ -162,7 +162,7 @@ function App() {
       } catch {}
       return new Set(STARTER_BUILDINGS);
     });
-    setWaveInfo({ wave: 0, buildPhase: true, buildTimer: 20, enemiesLeft: 0, enemiesTotal: 0 });
+    setWaveInfo({ wave: 0, buildPhase: true, buildTimer: 30, enemiesLeft: 0, enemiesTotal: 0 });
     setSelectedBuilding(TileType.SOLAR_PANEL);
     setSelectedModule(ModuleType.NONE);
     setShowMarket(false);

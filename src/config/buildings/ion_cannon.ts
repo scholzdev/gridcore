@@ -24,7 +24,7 @@ export const ION_CANNON_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'ion_cannon',
-    killCost: 80,
+    killCost: 500,
     tier: 5,
     shortDescription: 'Strahl mit 5× Aufladung',
   },

@@ -25,7 +25,7 @@ export const PLASMA_CANNON_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'plasma',
-    killCost: 50,
+    killCost: 200,
     tier: 4,
     shortDescription: 'Massiver Flächenschaden',
   },

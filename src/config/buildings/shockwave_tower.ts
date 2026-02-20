@@ -23,7 +23,7 @@ export const SHOCKWAVE_TOWER_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'shockwave_tower',
-    killCost: 80,
+    killCost: 500,
     tier: 5,
     shortDescription: 'AoE-Schockwelle alle 5 Ticks',
   },

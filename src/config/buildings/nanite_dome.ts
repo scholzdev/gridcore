@@ -20,7 +20,7 @@ export const NANITE_DOME_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'nanite_dome',
-    killCost: 80,
+    killCost: 500,
     tier: 5,
     shortDescription: 'Globale Reparatur aller Gebäude',
   },

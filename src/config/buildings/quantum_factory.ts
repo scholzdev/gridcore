@@ -21,7 +21,7 @@ export const QUANTUM_FACTORY_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'quantum_factory',
-    killCost: 80,
+    killCost: 500,
     tier: 5,
     shortDescription: 'Produziert Stahl + Elektronik + Daten',
   },

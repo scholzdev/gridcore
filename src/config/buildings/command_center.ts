@@ -23,7 +23,7 @@ export const COMMAND_CENTER_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'command_center',
-    killCost: 80,
+    killCost: 500,
     tier: 5,
     shortDescription: 'Globaler Schaden- & Feuerrate-Buff',
   },

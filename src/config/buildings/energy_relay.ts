@@ -21,7 +21,7 @@ export const ENERGY_RELAY_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'relay',
-    killCost: 50,
+    killCost: 200,
     tier: 4,
     shortDescription: 'Erhöht Geschütz-Feuerrate',
   },

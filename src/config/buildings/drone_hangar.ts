@@ -27,7 +27,7 @@ export const DRONE_HANGAR_CONFIG: BuildingConfig = {
 
   techTree: {
     id: 'drones',
-    killCost: 50,
+    killCost: 200,
     tier: 4,
     shortDescription: 'Autonome Angriffsdrohnen',
   },

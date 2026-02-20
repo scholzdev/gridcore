@@ -51,7 +51,7 @@ export const WAVE_CONFIG = {
   /** Speed scaling multiplier per wave */
   speedScalingPerWave: 0.08,
   /** Initial build phase duration (ticks) */
-  initialBuildTime: 20,
+  initialBuildTime: 30,
   /** Between-waves build phase duration (ticks) */
   betweenWavesBuildTime: 15,
 };
@@ -59,7 +59,7 @@ export const WAVE_CONFIG = {
 // ── Kill Reward Formula ──────────────────────────────────────
 export const KILL_REWARD = {
   /** Base scrap reward per kill */
-  base: 30,
+  base: 15,
   /** Additional scrap per second of game time */
   perSecond: 0.1,
 };
