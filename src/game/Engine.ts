@@ -71,7 +71,7 @@ export class GameEngine {
   buildingsPlaced: number = 0;
   difficulty: Difficulty = 'leicht';
   diffConfig: DifficultyConfig = DIFFICULTY_PRESETS['leicht'];
-  killPoints: number = 0;
+  killPoints: number = 500;
   unlockedBuildings: Set<TileType> = new Set(STARTER_BUILDINGS);
 
   // Game Mode
@@ -166,7 +166,7 @@ export class GameEngine {
     this.activeTiles = [];
     this.netIncome = { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
     this.buildingsPlaced = 0;
-    this.killPoints = 0;
+    this.killPoints = 500;
     this.unlockedBuildings = loadUnlocks();
     this.currentWave = 0;
     this.waveEnemiesTotal = 0;
@@ -194,7 +194,7 @@ export class GameEngine {
   resetUnlocks() {
     resetUnlocksStorage();
     this.unlockedBuildings = new Set(STARTER_BUILDINGS);
-    this.killPoints = 0;
+    this.killPoints = 500;
   }
 
   // ── Prestige ───────────────────────────────────────────────

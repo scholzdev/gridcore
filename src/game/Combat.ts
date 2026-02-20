@@ -6,6 +6,8 @@ import type { GameEngine } from './Engine';
 import { fireOnKill, fireOnHit, fireOnCombatTick, fireOnDestroyed, fireOnEnterKillRange, fireOnAllyDamaged, fireOnAuraTick, buildingRef } from './HookSystem';
 
 function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?: number) {
+  if (enemy.dead) return; // Already killed this tick — prevent double-counting
+  enemy.dead = true;
   engine.enemiesKilled++;
   engine.killPoints++;
   const killReward = Math.floor(KILL_REWARD.base + engine.gameTime * KILL_REWARD.perSecond);

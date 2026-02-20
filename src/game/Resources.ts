@@ -13,11 +13,11 @@ export class ResourceManager {
 
   constructor() {
     this.state = {
-      energy: 50,
-      scrap: 40, // Absoluter Startwert
-      data: 0,
-      steel: 0,
-      electronics: 0
+      energy: 10000,
+      scrap: 10000,
+      data: 10000,
+      steel: 10000,
+      electronics: 10000
     };
   }
 

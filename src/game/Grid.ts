@@ -3,7 +3,7 @@
 export { TileType, ModuleType, BUILDING_STATS, MODULE_DEFS, ORE_BUILDINGS, BUILDING_REGISTRY, getMaxHP } from '../config';
 export type { Building, ModuleDef } from '../config';
 
-import { TileType, ModuleType, BUILDING_STATS, MODULE_DEFS, ORE_BUILDINGS, getMaxHP } from '../config';
+import { TileType, ModuleType, BUILDING_STATS, BUILDING_REGISTRY, MODULE_DEFS, ORE_BUILDINGS, getMaxHP } from '../config';
 
 
 export class GameGrid {

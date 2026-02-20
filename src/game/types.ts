@@ -30,6 +30,8 @@ export interface Enemy {
   slowedUntil?: number; // timestamp until which enemy is slowed
   /** Slow multiplier applied while slowedUntil is active (set by slow-on-hit module) */
   slowFactor?: number;
+  /** Set to true when killEnemy() is called — prevents double-counting */
+  dead?: boolean;
 }
 
 // ── Wave Mode Constants ──────────────────────────────────────

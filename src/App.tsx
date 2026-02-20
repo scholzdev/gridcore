@@ -99,7 +99,7 @@ function App() {
           wave: engineRef.current.currentWave,
           buildPhase: engineRef.current.waveBuildPhase,
           buildTimer: engineRef.current.waveBuildTimer,
-          enemiesLeft: engineRef.current.waveEnemiesTotal - engineRef.current.waveEnemiesKilledThisWave,
+          enemiesLeft: Math.max(0, engineRef.current.waveEnemiesTotal - engineRef.current.waveEnemiesKilledThisWave),
           enemiesTotal: engineRef.current.waveEnemiesTotal,
         });
       }
