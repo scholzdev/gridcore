@@ -1,6 +1,5 @@
 import React from 'react';
 import { ModuleType, MODULE_DEFS, TileType, TECH_TREE } from '../config';
-import type { TechNode } from '../config';
 
 interface ModuleSidebarProps {
   selectedModule: ModuleType;
