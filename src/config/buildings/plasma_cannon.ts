@@ -13,7 +13,7 @@ export const PLASMA_CANNON_CONFIG: BuildingConfig = {
   damage: 300,
   cost: { steel: 500, electronics: 400, data: 200 },
   costIncrease: { steel: 300, electronics: 200, data: 100 },
-  consumes: { energy: 45 },
+  consumes: { energy: 30 },
 
   combat: {
     fireChance: 0.9,

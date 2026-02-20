@@ -32,6 +32,17 @@ import { LAB_CONFIG } from './buildings/lab';
 import { DATA_VAULT_CONFIG } from './buildings/data_vault';
 import { CRYSTAL_DRILL_CONFIG } from './buildings/crystal_drill';
 import { STEEL_SMELTER_CONFIG } from './buildings/steel_smelter';
+import { ENERGY_RELAY_CONFIG } from './buildings/energy_relay';
+import { FUSION_REACTOR_CONFIG } from './buildings/fusion_reactor';
+import { ARTILLERY_CONFIG } from './buildings/artillery';
+import { COMMAND_CENTER_CONFIG } from './buildings/command_center';
+import { ION_CANNON_CONFIG } from './buildings/ion_cannon';
+import { QUANTUM_FACTORY_CONFIG } from './buildings/quantum_factory';
+import { SHOCKWAVE_TOWER_CONFIG } from './buildings/shockwave_tower';
+import { NANITE_DOME_CONFIG } from './buildings/nanite_dome';
+import { ANNIHILATOR_CONFIG } from './buildings/annihilator';
+import { HYPER_REACTOR_CONFIG } from './buildings/hyper_reactor';
+import { GRAVITY_CANNON_CONFIG } from './buildings/gravity_cannon';
 
 // ── Module Configs ───────────────────────────────────────────
 import { ATTACK_SPEED_CONFIG } from './modules/attack_speed';
@@ -44,6 +55,7 @@ import { PIERCING_CONFIG } from './modules/piercing';
 import { REGEN_CONFIG } from './modules/regen';
 import { SLOW_HIT_CONFIG } from './modules/slow_hit';
 import { DOUBLE_YIELD_CONFIG } from './modules/double_yield';
+import { CRITICAL_HIT_CONFIG } from './modules/critical_hit';
 
 import type { BuildingConfig, ModuleConfig } from './types';
 import { TileType } from './types';
@@ -72,6 +84,17 @@ export const ALL_BUILDINGS: BuildingConfig[] = [
   DATA_VAULT_CONFIG,
   CRYSTAL_DRILL_CONFIG,
   STEEL_SMELTER_CONFIG,
+  ENERGY_RELAY_CONFIG,
+  FUSION_REACTOR_CONFIG,
+  ARTILLERY_CONFIG,
+  COMMAND_CENTER_CONFIG,
+  ION_CANNON_CONFIG,
+  QUANTUM_FACTORY_CONFIG,
+  SHOCKWAVE_TOWER_CONFIG,
+  NANITE_DOME_CONFIG,
+  ANNIHILATOR_CONFIG,
+  HYPER_REACTOR_CONFIG,
+  GRAVITY_CANNON_CONFIG,
 ];
 
 // ── All Modules Array ────────────────────────────────────────
@@ -86,6 +109,7 @@ export const ALL_MODULES: ModuleConfig[] = [
   REGEN_CONFIG,
   SLOW_HIT_CONFIG,
   DOUBLE_YIELD_CONFIG,
+  CRITICAL_HIT_CONFIG,
 ];
 
 // ── Lookup Maps ──────────────────────────────────────────────

@@ -80,17 +80,24 @@ export function detonateMines(engine: GameEngine) {
   }
 }
 
+// Module-level aura cache — computed per frame in turretLogic, read by updateDrones
+let _fireRateBuff: number[][] = [];
+
 export function turretLogic(engine: GameEngine) {
   const size = engine.grid.size;
 
   // Compute radar range buff per tile (config-driven: any building with radarRangeBuffBase)
   const radarBuff: number[][] = Array(size).fill(0).map(() => Array(size).fill(0));
+  // Compute fire rate buff per tile (config-driven: any building with fireRateBuffBase)
+  const fireRateBuff: number[][] = Array(size).fill(0).map(() => Array(size).fill(0));
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const tCfg = BUILDING_REGISTRY[engine.grid.tiles[y][x]];
-      if (tCfg?.support?.radarRangeBuffBase && engine.activeTiles[y]?.[x]) {
-        const level = engine.grid.levels[y][x] || 1;
-        const buffRange = tCfg.range || 5;
+      if (!tCfg?.support || !engine.activeTiles[y]?.[x]) continue;
+      const level = engine.grid.levels[y][x] || 1;
+      const buffRange = tCfg.range || 5;
+
+      if (tCfg.support.radarRangeBuffBase) {
         const rangeBuff = tCfg.support.radarRangeBuffBase + (level - 1) * (tCfg.support.radarRangeBuffPerLevel ?? 1);
         for (let dy = -buffRange; dy <= buffRange; dy++) {
           for (let dx = -buffRange; dx <= buffRange; dx++) {
@@ -101,8 +108,23 @@ export function turretLogic(engine: GameEngine) {
           }
         }
       }
+
+      if (tCfg.support.fireRateBuffBase) {
+        const frBuff = tCfg.support.fireRateBuffBase + (level - 1) * (tCfg.support.fireRateBuffPerLevel ?? 0);
+        for (let dy = -buffRange; dy <= buffRange; dy++) {
+          for (let dx = -buffRange; dx <= buffRange; dx++) {
+            const nx = x + dx; const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+            if (Math.sqrt(dx * dx + dy * dy) > buffRange) continue;
+            fireRateBuff[ny][nx] = Math.max(fireRateBuff[ny][nx], frBuff);
+          }
+        }
+      }
     }
   }
+
+  // Cache for updateDrones
+  _fireRateBuff = fireRateBuff;
 
   engine.laserBeams = [];
 
@@ -112,8 +134,110 @@ export function turretLogic(engine: GameEngine) {
       const cfg = BUILDING_REGISTRY[type];
       if (!cfg?.combat) continue;
 
+      // Skip contact-detonation buildings (e.g. Minefield) — handled by detonateMines()
+      if (cfg.combat.blastRadius) continue;
+
+      // Pulse-based AoE (e.g. Shockwave Tower) — fires every N ticks
+      if (cfg.combat.pulseRadius) {
+        const interval = cfg.combat.pulseInterval ?? 5;
+        if (engine.gameTime % interval !== 0) continue;
+        if (cfg.consumes?.energy && !engine.activeTiles[y]?.[x]) continue;
+        const level = engine.grid.levels[y][x] || 1;
+        const mult = getLevelMult(level);
+        const pulseDmg = (BUILDING_STATS[type].damage!) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
+        const pulseR = cfg.combat.pulseRadius;
+        let hitAny = false;
+        for (const e of engine.enemies) {
+          const dist = Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2));
+          if (dist <= pulseR) {
+            e.health -= pulseDmg;
+            hitAny = true;
+            engine.addDamageNumber(e.x, e.y, pulseDmg, cfg.color);
+            if (e.health <= 0) {
+              killEnemy(engine, e, x, y);
+              fireOnKill(engine, x, y, e);
+            } else {
+              fireOnHit(engine, x, y, e, pulseDmg, false, 0);
+            }
+          }
+        }
+        if (hitAny) {
+          // Visual: shockwave ring
+          engine.projectiles.push({
+            x, y, tx: x, ty: y, speed: 0,
+            color: cfg.color, damage: 0, splash: pulseR,
+            active: true, age: 0, maxAge: 1,
+          } as any);
+        }
+        continue;
+      }
+
+      // Line-beam (Annihilator) — fires a devastating beam hitting all enemies along a line
+      if (cfg.combat.lineBeam) {
+        const interval = cfg.combat.lineBeamInterval ?? 10;
+        if (engine.gameTime % interval !== 0) continue;
+        if (cfg.consumes?.energy && !engine.activeTiles[y]?.[x]) continue;
+        if (engine.enemies.length === 0) continue;
+
+        const level = engine.grid.levels[y][x] || 1;
+        const mult = getLevelMult(level);
+        const beamDmg = (BUILDING_STATS[type].damage!) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
+
+        // Pick the closest enemy as target direction
+        let closest = engine.enemies[0];
+        let closestDist = Infinity;
+        for (const e of engine.enemies) {
+          const d = Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2));
+          if (d < closestDist) { closestDist = d; closest = e; }
+        }
+
+        // Direction vector from tower to target
+        const dirX = closest.x - x;
+        const dirY = closest.y - y;
+        const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+        if (dirLen < 0.01) continue;
+        const nDirX = dirX / dirLen;
+        const nDirY = dirY / dirLen;
+
+        // Hit all enemies within 1.5 tiles of the beam line
+        const beamWidth = 1.5;
+        for (const e of engine.enemies) {
+          // Project enemy position onto beam line
+          const ex = e.x - x;
+          const ey = e.y - y;
+          const dot = ex * nDirX + ey * nDirY;
+          if (dot < 0) continue; // behind the tower
+          // Perpendicular distance from enemy to beam line
+          const perpX = ex - dot * nDirX;
+          const perpY = ey - dot * nDirY;
+          const perpDist = Math.sqrt(perpX * perpX + perpY * perpY);
+          if (perpDist <= beamWidth) {
+            e.health -= beamDmg;
+            engine.addDamageNumber(e.x, e.y, beamDmg, cfg.color);
+            if (e.health <= 0) {
+              killEnemy(engine, e, x, y);
+              fireOnKill(engine, x, y, e);
+            } else {
+              fireOnHit(engine, x, y, e, beamDmg, true, 0);
+            }
+          }
+        }
+
+        // Visual: laser beam across map
+        const beamEnd = 50; // extend beam far
+        engine.laserBeams.push({
+          fromX: x + 0.5, fromY: y + 0.5,
+          toX: x + 0.5 + nDirX * beamEnd, toY: y + 0.5 + nDirY * beamEnd,
+          color: cfg.color, width: 4,
+        });
+        continue;
+      }
+
       // Skip unpowered turrets that consume energy
       if (cfg.consumes?.energy && !engine.activeTiles[y]?.[x]) continue;
+
+      // Artillery requires nearby radar coverage to fire
+      if (type === TileType.ARTILLERY && radarBuff[y][x] <= 0) continue;
 
       const level = engine.grid.levels[y][x] || 1;
       const stats = BUILDING_STATS[type];
@@ -121,7 +245,7 @@ export function turretLogic(engine: GameEngine) {
       const baseRange = (stats.range || 6) + radarBuff[y][x];
       const mult = getLevelMult(level);
       const baseDmg = (stats.damage!) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
-      const baseFireChance = cfg.combat.fireChance ?? 0.9;
+      const baseFireChance = (cfg.combat.fireChance ?? 0.9) - fireRateBuff[y][x];
 
       // Fire onCombatTick — hooks (building + module) can mutate damage, fireChance, effectiveRange
       const inRange = engine.enemies.filter(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= baseRange);
@@ -320,7 +444,7 @@ export function updateDrones(engine: GameEngine) {
     // Use fireOnCombatTick to let module hooks modify range/damage/fireChance for the hangar
     const hMult = getLevelMult(hangarLevel);
     const baseDroneDmg = (droneCfg.damage || 25) * hMult * engine.dataVaultBuff * engine.prestigeDamageMult;
-    const baseDroneFireChance = droneCombat.droneFireChance ?? 0.88;
+    const baseDroneFireChance = (droneCombat.droneFireChance ?? 0.88) - (_fireRateBuff[d.hangarY]?.[d.hangarX] ?? 0);
     const droneCtEvent = fireOnCombatTick(engine, d.hangarX, d.hangarY, engine.gameTime, [], baseHangarRange, baseDroneDmg, baseDroneFireChance);
     const hangarRange = droneCtEvent.effectiveRange;
 
@@ -392,6 +516,43 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
         if (engine.grid.healths[ty][tx] <= 0) {
           fireOnDestroyed(engine, tx, ty, tile, e);
           if (tile === TileType.CORE) engine.gameOver = true;
+
+          // Explosion on destroy (e.g. Hyperreaktor)
+          const tileCfg = BUILDING_REGISTRY[tile];
+          if (tileCfg?.explosionOnDestroy) {
+            const expR = tileCfg.explosionOnDestroy;
+            const expDmg = tileCfg.explosionDamage ?? 1000;
+            for (let ey = Math.max(0, ty - expR); ey <= Math.min(engine.grid.size - 1, ty + expR); ey++) {
+              for (let ex = Math.max(0, tx - expR); ex <= Math.min(engine.grid.size - 1, tx + expR); ex++) {
+                if (ex === tx && ey === ty) continue;
+                const dist = Math.sqrt(Math.pow(ex - tx, 2) + Math.pow(ey - ty, 2));
+                if (dist > expR) continue;
+                const nType = engine.grid.tiles[ey][ex];
+                if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
+                  engine.grid.healths[ey][ex] -= expDmg;
+                  engine.addDamageNumber(ex + 0.5, ey + 0.3, expDmg, '#ffbe0b');
+                  if (engine.grid.healths[ey][ex] <= 0) {
+                    fireOnDestroyed(engine, ex, ey, nType, e);
+                    if (nType === TileType.CORE) engine.gameOver = true;
+                    engine.grid.tiles[ey][ex] = ORE_BUILDINGS.includes(nType) ? TileType.ORE_PATCH : TileType.EMPTY;
+                    engine.grid.levels[ey][ex] = 0;
+                    engine.grid.shields[ey][ex] = 0;
+                  }
+                }
+              }
+            }
+            // Visual: explosion particles
+            for (let i = 0; i < 20; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              const speed = 0.05 + Math.random() * 0.1;
+              engine.particles.push({
+                x: tx + 0.5, y: ty + 0.5,
+                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                life: 30 + Math.random() * 20, color: '#ffbe0b',
+              });
+            }
+          }
+
           engine.grid.tiles[ty][tx] = ORE_BUILDINGS.includes(tile) ? TileType.ORE_PATCH : TileType.EMPTY;
           engine.grid.levels[ty][tx] = 0;
           engine.grid.shields[ty][tx] = 0;
@@ -422,12 +583,33 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     // Slow-on-hit module — slowFactor stored on enemy by onHit hook
     const moduleSlowFactor = (e.slowedUntil && Date.now() < e.slowedUntil && e.slowFactor) ? e.slowFactor : 1;
 
+    // Gravity Cannon — pull enemies toward cannon + additional slow
+    let gravitySlow = 1;
+    for (let sy = Math.max(0, ty - 15); sy <= Math.min(engine.grid.size - 1, ty + 15); sy++) {
+      for (let sx = Math.max(0, tx - 15); sx <= Math.min(engine.grid.size - 1, tx + 15); sx++) {
+        const gCfg = BUILDING_REGISTRY[engine.grid.tiles[sy][sx]];
+        if (!gCfg?.support?.gravityPull || !engine.activeTiles[sy]?.[sx]) continue;
+        const gRange = gCfg.range || 12;
+        const dist = Math.sqrt(Math.pow(e.x - sx, 2) + Math.pow(e.y - sy, 2));
+        if (dist <= gRange && dist > 0.5) {
+          // Pull enemy toward cannon
+          const pullStr = gCfg.support.gravityPull;
+          const pdx = sx + 0.5 - e.x;
+          const pdy = sy + 0.5 - e.y;
+          e.x += (pdx / dist) * pullStr;
+          e.y += (pdy / dist) * pullStr;
+          // Apply gravity slow
+          gravitySlow = Math.min(gravitySlow, 1 - (gCfg.support.gravitySlow ?? 0));
+        }
+      }
+    }
+
     const dx = engine.grid.coreX + 0.5 - e.x;
     const dy = engine.grid.coreY + 0.5 - e.y;
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d > 0.1) {
-      e.x += (dx / d) * e.speed * slowFactor * moduleSlowFactor;
-      e.y += (dy / d) * e.speed * slowFactor * moduleSlowFactor;
+      e.x += (dx / d) * e.speed * slowFactor * moduleSlowFactor * gravitySlow;
+      e.y += (dy / d) * e.speed * slowFactor * moduleSlowFactor * gravitySlow;
     }
     return true;
   });

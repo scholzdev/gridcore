@@ -13,7 +13,7 @@ export const LASER_TURRET_CONFIG: BuildingConfig = {
   damage: 50,
   cost: { steel: 200, electronics: 150 },
   costIncrease: { steel: 100, electronics: 75 },
-  consumes: { energy: 30 },
+  consumes: { energy: 20 },
 
   combat: {
     fireChance: 0.9,

@@ -11,6 +11,8 @@ import type { MarketState } from './Market';
 import { createResearchState, computeResearchBuffs, getResearchLevel, getResearchCost, canResearch, RESEARCH_NODES } from './Research';
 import type { ResearchState, ResearchBuffs } from './Research';
 import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
+import { createMapEventState, tickMapEvents, updateEventNotifications } from './MapEvents';
+import type { MapEventState } from './MapEvents';
 import { DIFFICULTY_PRESETS, WAVE_CONFIG } from './types';
 import type { TechNode } from './TechTree';
 import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech } from './HookSystem';
@@ -48,6 +50,10 @@ export class GameEngine {
   // Research 2.0
   research: ResearchState;
   researchBuffs: ResearchBuffs;
+
+  // Map Events
+  mapEvents: MapEventState;
+  solarStormMult: number = 1;
 
   lastTick: number = 0;
   tickRate: number = 1000;
@@ -96,6 +102,7 @@ export class GameEngine {
     this.market = createMarketState();
     this.research = createResearchState();
     this.researchBuffs = computeResearchBuffs(this.research);
+    this.mapEvents = createMapEventState();
     this.applyPrestigeStartBonuses();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -178,6 +185,8 @@ export class GameEngine {
     this.research = createResearchState();
     this.researchBuffs = computeResearchBuffs(this.research);
     this.placingCore = true;
+    this.mapEvents = createMapEventState();
+    this.solarStormMult = 1;
     this.applyPrestigeStartBonuses();
     Object.values(TileType).forEach(v => { if (typeof v === 'number') this.purchasedCounts[v] = 0; });
   }
@@ -416,6 +425,9 @@ export class GameEngine {
         this.waveBuildTimer--;
         if (this.waveBuildTimer <= 0) this.startNextWave();
       }
+
+      // Map Events
+      tickMapEvents(this);
     }
 
     // Spawning
@@ -448,6 +460,9 @@ export class GameEngine {
       d.life--;
       return d.life > 0;
     });
+
+    // Update event notifications
+    updateEventNotifications(this);
 
     // Render
     this.renderer.draw(this);
@@ -509,6 +524,11 @@ export class GameEngine {
           if (income.steel) income.steel *= baseMult;
           if (income.electronics) income.electronics *= baseMult;
           if (income.data) income.data *= baseMult;
+
+          // Solar storm event: 3× energy for solar panels
+          if (income.energy && type === TileType.SOLAR_PANEL) {
+            income.energy *= this.solarStormMult;
+          }
 
           // Fire onResourceGained — hooks can modify incomeMult (Overcharge, DoubleYield, Lab dataOutputMult)
           const rgEvent = fireOnResourceGained(this, x, y, {
@@ -653,4 +673,8 @@ export class GameEngine {
 
   // ── GameCtx interface helpers ──────────────────────────────
   addParticle(p: Particle) { this.particles.push(p); }
+
+  addEventNotification(text: string, color: string) {
+    this.mapEvents.notifications.push({ text, color, life: 120 });
+  }
 }

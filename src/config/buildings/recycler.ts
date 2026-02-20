@@ -9,9 +9,9 @@ export const RECYCLER_CONFIG: BuildingConfig = {
   category: 'processing',
 
   health: 1200,
-  cost: { steel: 150, electronics: 100, data: 50 },
-  costIncrease: { steel: 75, electronics: 50, data: 25 },
-  consumes: { energy: 40, scrap: 15 },
+  cost: { steel: 250, electronics: 150, data: 80 },
+  costIncrease: { steel: 100, electronics: 75, data: 40 },
+  consumes: { energy: 25 },
   income: { steel: 10, electronics: 8 },
 
   techTree: {

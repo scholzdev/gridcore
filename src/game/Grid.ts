@@ -1,6 +1,6 @@
 
 // Re-export everything from config for backward compatibility
-export { TileType, ModuleType, BUILDING_STATS, MODULE_DEFS, ORE_BUILDINGS, getMaxHP } from '../config';
+export { TileType, ModuleType, BUILDING_STATS, MODULE_DEFS, ORE_BUILDINGS, BUILDING_REGISTRY, getMaxHP } from '../config';
 export type { Building, ModuleDef } from '../config';
 
 import { TileType, ModuleType, BUILDING_STATS, MODULE_DEFS, ORE_BUILDINGS, getMaxHP } from '../config';
@@ -61,6 +61,18 @@ export class GameGrid {
     // Regeln prüfen
     if (ORE_BUILDINGS.includes(type)) { if (current !== TileType.ORE_PATCH) return false; }
     else { if (current !== TileType.EMPTY) return false; }
+
+    // maxCount check (e.g. Command Center: max 1)
+    const cfg = BUILDING_REGISTRY[type];
+    if (cfg?.maxCount) {
+      let count = 0;
+      for (let r = 0; r < this.size; r++) {
+        for (let c = 0; c < this.size; c++) {
+          if (this.tiles[r][c] === type) count++;
+        }
+      }
+      if (count >= cfg.maxCount) return false;
+    }
 
     this.tiles[y][x] = type;
     this.levels[y][x] = 1;

@@ -63,14 +63,15 @@ export const TechNodeCard = ({ node, isUnlocked, canAfford, onUnlock }: TechNode
         display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'default'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: bColor, flexShrink: 0 }} />
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#2d3436' }}>{node.name}</span>
-          <span style={{ fontSize: '10px', opacity: 0.6 }}>{costStr}</span>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+        <div style={{ width: '14px', height: '14px', borderRadius: '3px', backgroundColor: bColor, flexShrink: 0, marginTop: '2px' }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#2d3436' }}>{node.name}</span>
+            {!isUnlocked && <span style={{ fontSize: '12px', flexShrink: 0 }}>🔒</span>}
+          </div>
+          <span style={{ fontSize: '10px', opacity: 0.6, display: 'block', marginTop: '2px', lineHeight: '1.3' }}>{costStr}</span>
         </div>
-        {isUnlocked && <span style={{ fontSize: '12px', flexShrink: 0 }}>✅</span>}
-        {!isUnlocked && <span style={{ fontSize: '12px', flexShrink: 0 }}>🔒</span>}
       </div>
       {!isUnlocked && (
         <button onClick={onUnlock} disabled={!canAfford} style={{

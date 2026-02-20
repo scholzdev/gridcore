@@ -24,6 +24,17 @@ export enum TileType {
   DRONE_HANGAR = 21,
   CRYSTAL_DRILL = 22,
   STEEL_SMELTER = 23,
+  ENERGY_RELAY = 24,
+  FUSION_REACTOR = 25,
+  ARTILLERY = 26,
+  COMMAND_CENTER = 27,
+  ION_CANNON = 28,
+  QUANTUM_FACTORY = 29,
+  SHOCKWAVE_TOWER = 30,
+  NANITE_DOME = 31,
+  ANNIHILATOR = 32,
+  HYPER_REACTOR = 33,
+  GRAVITY_CANNON = 34,
 }
 
 // ── Module Types ─────────────────────────────────────────────
@@ -39,6 +50,7 @@ export enum ModuleType {
   REGEN = 8,
   SLOW_HIT = 9,
   DOUBLE_YIELD = 10,
+  CRITICAL_HIT = 11,
 }
 
 // ── Resource Cost ────────────────────────────────────────────
@@ -115,6 +127,14 @@ export interface BuildingConfig {
     /** Drone: base drones before +level */
     maxDronesBase?: number;
     maxDronesPerLevel?: number;
+    /** Shockwave: pulse radius */
+    pulseRadius?: number;
+    /** Shockwave: ticks between pulses */
+    pulseInterval?: number;
+    /** Annihilator: line-beam width (fires a beam hitting all enemies in a line) */
+    lineBeam?: boolean;
+    /** Annihilator: ticks between line-beam shots */
+    lineBeamInterval?: number;
   };
 
   // ── Support (non-combat active buildings) ────────────────
@@ -133,6 +153,14 @@ export interface BuildingConfig {
     radarRangeBuffBase?: number;
     /** Radar: range buff increase per level */
     radarRangeBuffPerLevel?: number;
+    /** Energy Relay: base fire rate buff (subtracted from fireChance) */
+    fireRateBuffBase?: number;
+    /** Energy Relay: fire rate buff increase per level */
+    fireRateBuffPerLevel?: number;
+    /** Gravity Cannon: pull strength (tiles per tick enemies are pulled toward cannon) */
+    gravityPull?: number;
+    /** Gravity Cannon: slow percentage applied to enemies in range */
+    gravitySlow?: number;
   };
 
   // ── Tech Tree ────────────────────────────────────────────
@@ -142,6 +170,14 @@ export interface BuildingConfig {
     tier: number;
     shortDescription: string;
   };
+
+  /** Explosion radius when destroyed (damages nearby buildings) */
+  explosionOnDestroy?: number;
+  /** Explosion damage when destroyed */
+  explosionDamage?: number;
+
+  /** Maximum number of this building allowed on the map (e.g. 1 for Command Center) */
+  maxCount?: number;
 
   /** Display order within category in the sidebar */
   order?: number;

@@ -11,7 +11,7 @@ export const LAB_CONFIG: BuildingConfig = {
   health: 800,
   cost: { steel: 80, electronics: 60 },
   costIncrease: { steel: 40, electronics: 30 },
-  consumes: { energy: 45, electronics: 2 },
+  consumes: { energy: 30 },
   income: { data: 20 },
 
   techTree: {

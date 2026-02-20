@@ -17,8 +17,8 @@ export const TechTreeOverlay = ({ killPoints, unlockedBuildings, onUnlock, onClo
     display: 'flex', alignItems: 'center', justifyContent: 'center'
   }}>
     <div onClick={(e) => e.stopPropagation()} style={{
-      backgroundColor: '#fff', borderRadius: '16px', padding: '30px',
-      maxWidth: '1100px', width: '95%', maxHeight: '90vh', overflowY: 'auto',
+      backgroundColor: '#fff', borderRadius: '12px', padding: '20px',
+      maxWidth: '900px', width: '90%', maxHeight: '80vh', overflowY: 'auto',
       boxShadow: '0 20px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -27,10 +27,11 @@ export const TechTreeOverlay = ({ killPoints, unlockedBuildings, onUnlock, onClo
           background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#7f8c8d'
         }}>✕</button>
       </div>
-      {[1, 2, 3, 4].map(tier => {
+      {[1, 2, 3, 4, 5, 6].map(tier => {
         const tierNodes = TECH_TREE.filter((n: TechNode) => n.tier === tier);
-        const tierLabels = ['', 'Basis', 'Erweitert', 'Fortgeschritten', 'Elite'];
-        const tierColors = ['', '#27ae60', '#f39c12', '#e74c3c', '#8e44ad'];
+        if (tierNodes.length === 0) return null;
+        const tierLabels = ['', 'Basis', 'Erweitert', 'Fortgeschritten', 'Elite', 'Legendär', 'Ultimativ'];
+        const tierColors = ['', '#27ae60', '#f39c12', '#e74c3c', '#8e44ad', '#2c3e50', '#ff006e'];
         return (
           <div key={tier} style={{ marginBottom: '16px' }}>
             <div style={{
@@ -40,7 +41,7 @@ export const TechTreeOverlay = ({ killPoints, unlockedBuildings, onUnlock, onClo
             }}>
               Tier {tier} — {tierLabels[tier]} · {tierNodes[0]?.killCost} KP pro Gebäude
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tierNodes.length}, 1fr)`, gap: '8px', alignItems: 'stretch' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(160px, 1fr))`, gap: '8px', alignItems: 'stretch' }}>
               {tierNodes.map((node: TechNode) => (
                 <TechNodeCard
                   key={node.id}

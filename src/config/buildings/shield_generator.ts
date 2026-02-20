@@ -12,7 +12,7 @@ export const SHIELD_GENERATOR_CONFIG: BuildingConfig = {
   range: 4,
   cost: { steel: 100, energy: 50 },
   costIncrease: { steel: 50, energy: 25 },
-  consumes: { energy: 25 },
+  consumes: { energy: 15 },
 
   support: {
     shieldCap: 500,

@@ -13,7 +13,7 @@ export const DRONE_HANGAR_CONFIG: BuildingConfig = {
   damage: 45,
   cost: { steel: 250, electronics: 200, data: 50 },
   costIncrease: { steel: 125, electronics: 100, data: 25 },
-  consumes: { energy: 35 },
+  consumes: { energy: 25 },
 
   combat: {
     projectileSpeed: 0.5,

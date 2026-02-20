@@ -113,6 +113,9 @@ export class Renderer {
     // Damage numbers
     this.drawDamageNumbers(engine.damageNumbers, zoom);
 
+    // Event notifications
+    this.drawEventNotifications(engine);
+
     // Core placement overlay
     if (engine.placingCore) {
       this.drawCorePlacement(engine, zoom);
@@ -296,6 +299,34 @@ export class Renderer {
       ctx.shadowBlur = 0;
     });
     ctx.globalAlpha = 1;
+  }
+
+  private drawEventNotifications(engine: GameEngine) {
+    const { ctx, canvas } = this;
+    const notifications = engine.mapEvents.notifications;
+    if (notifications.length === 0) return;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    notifications.forEach((n, i) => {
+      const alpha = Math.min(1, n.life / 30);
+      const y = 30 + i * 28;
+      ctx.globalAlpha = alpha * 0.7;
+      ctx.fillStyle = '#000';
+      const textWidth = ctx.measureText(n.text).width;
+      ctx.fillRect(canvas.width / 2 - textWidth / 2 - 10, y - 12, textWidth + 20, 24);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = n.color;
+      ctx.font = 'bold 14px monospace';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 4;
+      ctx.fillText(n.text, canvas.width / 2, y);
+      ctx.shadowBlur = 0;
+    });
+
+    ctx.restore();
   }
 
   drawGameOver(engine: GameEngine) {

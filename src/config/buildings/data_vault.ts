@@ -9,9 +9,9 @@ export const DATA_VAULT_CONFIG: BuildingConfig = {
   category: 'research',
 
   health: 1500,
-  cost: { steel: 200, electronics: 150, data: 100 },
-  costIncrease: { steel: 100, electronics: 75, data: 50 },
-  consumes: { energy: 25, data: 10 },
+  cost: { steel: 300, electronics: 200, data: 150 },
+  costIncrease: { steel: 150, electronics: 100, data: 75 },
+  consumes: { energy: 15 },
 
   support: {
     damageBuff: 0.15,

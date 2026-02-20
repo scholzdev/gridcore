@@ -11,7 +11,7 @@ export const FOUNDRY_CONFIG: BuildingConfig = {
   health: 1000,
   cost: { scrap: 120, energy: 40 },
   costIncrease: { scrap: 40, energy: 20 },
-  consumes: { energy: 15, scrap: 5 },
+  consumes: { energy: 15 },
   income: { steel: 12 },
 
   techTree: {
