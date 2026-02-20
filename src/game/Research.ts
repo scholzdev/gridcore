@@ -1,6 +1,9 @@
 /**
  * Forschungsbaum 2.0 — Run-based research using Data as currency.
  * Resets on game over, unlike the permanent Tech Tree.
+ *
+ * Branching: At each tier you have 3 choices but can only pick 2.
+ * Once 2 nodes in a tier are researched (level >= 1), the third is locked.
  */
 
 export interface ResearchNode {
@@ -19,23 +22,26 @@ export interface ResearchState {
   levels: Record<string, number>;
 }
 
+/** How many nodes per tier a player may unlock */
+export const TIER_PICK_LIMIT = 2;
+
 export const RESEARCH_NODES: ResearchNode[] = [
-  // Tier 1 — cheap, foundational
+  // Tier 1 — cheap, foundational (pick 2 of 3)
   { id: 'armor',       name: 'Panzerung',          description: 'Alle Gebäude +20% HP pro Stufe',           maxLevel: 3, costBase: 30,  costScale: 2.0, tier: 1, color: '#636e72' },
   { id: 'cheapBuild',  name: 'Schnellbau',         description: 'Baukosten -8% pro Stufe',                  maxLevel: 3, costBase: 25,  costScale: 2.0, tier: 1, color: '#00b894' },
   { id: 'fireRate',    name: 'Übertaktung',        description: 'Alle Türme +12% Feuerrate pro Stufe',      maxLevel: 3, costBase: 35,  costScale: 2.0, tier: 1, color: '#e74c3c' },
 
-  // Tier 2 — mid
+  // Tier 2 — mid (pick 2 of 3)
   { id: 'efficiency',  name: 'Effizienzprotokoll', description: 'Alle Verbraucher -15% Energiebedarf/Stufe', maxLevel: 3, costBase: 60,  costScale: 2.0, tier: 2, requires: 'cheapBuild', color: '#2ecc71' },
   { id: 'yield',       name: 'Ertragsforschung',   description: 'Produzenten +20% Output pro Stufe',        maxLevel: 3, costBase: 70,  costScale: 2.0, tier: 2, requires: 'cheapBuild', color: '#f39c12' },
   { id: 'shieldBoost', name: 'Schildverstärkung',  description: 'Schildgeneratoren +25% Stärke/Stufe',      maxLevel: 3, costBase: 55,  costScale: 2.0, tier: 2, requires: 'armor', color: '#74b9ff' },
 
-  // Tier 3 — expensive
+  // Tier 3 — expensive (pick 2 of 3)
   { id: 'range',       name: 'Reichweitensensor',  description: 'Alle Türme +1 Reichweite pro Stufe',       maxLevel: 3, costBase: 100, costScale: 2.5, tier: 3, requires: 'fireRate', color: '#a29bfe' },
   { id: 'repairBoost', name: 'Notfallreparatur',   description: 'Reparaturbucht +40% Heilrate/Stufe',       maxLevel: 3, costBase: 90,  costScale: 2.5, tier: 3, requires: 'shieldBoost', color: '#e056a0' },
   { id: 'dataCompress',name: 'Datenkompression',   description: 'Labore +30% Daten-Output pro Stufe',       maxLevel: 3, costBase: 80,  costScale: 2.0, tier: 3, requires: 'yield', color: '#3498db' },
 
-  // Tier 4 — ultimate
+  // Tier 4 — ultimate (only 1 node, no branching restriction)
   { id: 'moduleSynergy', name: 'Modulsynergie',    description: 'Module-Effekte +20% pro Stufe',            maxLevel: 3, costBase: 150, costScale: 3.0, tier: 4, requires: 'range', color: '#fd79a8' },
 ];
 
@@ -51,10 +57,25 @@ export function getResearchCost(node: ResearchNode, currentLevel: number): numbe
   return Math.floor(node.costBase * Math.pow(node.costScale, currentLevel));
 }
 
+/** Check if a tier's pick limit has been reached and this node is NOT one of the picked */
+export function isTierLocked(state: ResearchState, node: ResearchNode): boolean {
+  const tierNodes = RESEARCH_NODES.filter(n => n.tier === node.tier);
+  // If tier has <= TIER_PICK_LIMIT nodes, no locking needed
+  if (tierNodes.length <= TIER_PICK_LIMIT) return false;
+  const pickedInTier = tierNodes.filter(n => getResearchLevel(state, n.id) >= 1);
+  if (pickedInTier.length >= TIER_PICK_LIMIT) {
+    // This node is locked if it's not already picked
+    return getResearchLevel(state, node.id) < 1;
+  }
+  return false;
+}
+
 export function canResearch(state: ResearchState, node: ResearchNode, dataAvailable: number): boolean {
   const level = getResearchLevel(state, node.id);
   if (level >= node.maxLevel) return false;
   if (node.requires && getResearchLevel(state, node.requires) < 1) return false;
+  // Tier branching lock
+  if (isTierLocked(state, node)) return false;
   return dataAvailable >= getResearchCost(node, level);
 }
 

@@ -1,4 +1,5 @@
 import { MODULE_DEFS } from '../config';
+import { MAX_BUILDING_LEVEL } from '../constants';
 
 interface TooltipProps {
   x: number;
@@ -29,7 +30,7 @@ export const Tooltip = ({ x, y, data }: TooltipProps) => (
 
       <div style={{ marginTop: '5px', opacity: 0.7, fontSize: '11px' }}>Zustand: {Math.floor(data.hp)} HP{data.shield > 0 ? ` | Schild: ${Math.floor(data.shield)}` : ''}</div>
 
-      {data.upgradeCost && data.level < 5 && (
+      {data.upgradeCost && data.level < MAX_BUILDING_LEVEL && data.tileType !== 2 /* CORE */ && (
         <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #ccc' }}>
           <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#27ae60' }}>UPGRADE-KOSTEN (Klick):</div>
           <div style={{ fontSize: '11px' }}>
@@ -41,7 +42,7 @@ export const Tooltip = ({ x, y, data }: TooltipProps) => (
           </div>
         </div>
       )}
-      {data.level >= 5 && <div style={{ marginTop: '5px', color: '#e74c3c', fontSize: '11px', fontWeight: 'bold' }}>MAX STUFE</div>}
+      {data.level >= MAX_BUILDING_LEVEL && data.tileType !== 2 /* CORE */ && <div style={{ marginTop: '5px', color: '#e74c3c', fontSize: '11px', fontWeight: 'bold' }}>MAX STUFE</div>}
 
       {data.canRemove && data.refund && (
         <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #ccc' }}>

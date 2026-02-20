@@ -1,3 +1,5 @@
+import { STARTING_ENERGY, STARTING_SCRAP } from '../constants';
+
 export type ResourceType = 'energy' | 'scrap' | 'data' | 'steel' | 'electronics';
 
 export interface ResourceState {
@@ -13,8 +15,8 @@ export class ResourceManager {
 
   constructor() {
     this.state = {
-      energy: 100,
-      scrap: 500,
+      energy: STARTING_ENERGY,
+      scrap: STARTING_SCRAP,
       data: 0,
       steel: 0,
       electronics: 0

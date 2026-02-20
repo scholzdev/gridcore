@@ -1,11 +1,16 @@
 import { TileType, BUILDING_STATS, BUILDING_REGISTRY, ORE_BUILDINGS, getLevelMult, ModuleType } from '../config';
 import type { BuildingConfig } from '../config';
 import type { Enemy } from './types';
-import { KILL_REWARD } from './types';
+import { KILL_REWARD, ENEMY_TYPES } from './types';
 import type { GameEngine } from './Engine';
 import { fireOnKill, fireOnHit, fireOnCombatTick, fireOnDestroyed, fireOnEnterKillRange, fireOnAllyDamaged, fireOnAuraTick, buildingRef } from './HookSystem';
 import { playKillThrottled, playShootThrottled, playCoreHit, playGameOver } from './Sound';
 import { isAbilityActive } from './Abilities';
+import {
+  THORNS_REFLECT_FRACTION, WALL_SLOW_DURATION_MS, WALL_SLOW_FACTOR,
+  ABSORBER_RANGE, ABSORBER_DAMAGE_MULT, PROJECTILE_HIT_THRESHOLD,
+  PATHFINDING_WAYPOINT_THRESHOLD,
+} from '../constants';
 
 // Throttle core-hit so it doesn't spam
 let lastCoreHitTime = 0;
@@ -16,13 +21,23 @@ function playCoreHitThrottled() {
   playCoreHit();
 }
 
+/** Update turret facing angle and spawn a muzzle flash particle */
+function turretFired(engine: GameEngine, tx: number, ty: number, targetX: number, targetY: number) {
+  const angle = Math.atan2(targetY - (ty + 0.5), targetX - (tx + 0.5));
+  if (engine.turretAngles[ty]?.[tx] !== undefined) {
+    engine.turretAngles[ty][tx] = angle;
+  }
+  engine.muzzleFlashes.push({ x: tx + 0.5, y: ty + 0.5, life: 6 });
+}
+
 function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?: number) {
   if (enemy.dead) return; // Already killed this tick — prevent double-counting
   enemy.dead = true;
   playKillThrottled();
   engine.enemiesKilled++;
   engine.killPoints++;
-  const killReward = Math.floor(KILL_REWARD.base + engine.gameTime * KILL_REWARD.perSecond);
+  const typeDef = ENEMY_TYPES[enemy.enemyType || 'normal'];
+  const killReward = Math.floor((KILL_REWARD.base + engine.gameTime * KILL_REWARD.perSecond) * typeDef.rewardMult);
   engine.resources.add({ scrap: killReward });
   if (engine.gameMode === 'wellen') engine.onWaveEnemyKilled();
   if (sourceX !== undefined && sourceY !== undefined) {
@@ -210,6 +225,7 @@ export function turretLogic(engine: GameEngine) {
         const dirY = closest.y - y;
         const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
         if (dirLen < 0.01) continue;
+        turretFired(engine, x, y, closest.x, closest.y);
         const nDirX = dirX / dirLen;
         const nDirY = dirY / dirLen;
 
@@ -295,6 +311,7 @@ function fireMultiTarget(engine: GameEngine, x: number, y: number, range: number
   const selected = targets.slice(0, maxTargets);
   if (selected.length > 0 && Math.random() > fireChance) {
     playShootThrottled();
+    turretFired(engine, x, y, selected[0].x, selected[0].y);
     selected.forEach(target => {
       engine.projectiles.push({
         id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
@@ -312,6 +329,7 @@ function fireSplash(engine: GameEngine, x: number, y: number, range: number, dmg
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target && Math.random() > (fireChance + (combat.fireChanceModifier ?? 0))) {
     playShootThrottled();
+    turretFired(engine, x, y, target.x, target.y);
     engine.projectiles.push({
       id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
       targetX: target.x, targetY: target.y, targetId: target.id,
@@ -327,6 +345,7 @@ function fireBeam(engine: GameEngine, x: number, y: number, range: number, dmg: 
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target) {
     const key = `${x},${y}`;
+    turretFired(engine, x, y, target.x, target.y);
     let focus = engine.laserFocus.get(key);
     if (!focus || focus.targetId !== target.id) {
       focus = { targetId: target.id, ticks: 0 };
@@ -362,6 +381,7 @@ function fireProjectile(engine: GameEngine, x: number, y: number, range: number,
   const target = engine.enemies.find(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   if (target && Math.random() > fireChance) {
     playShootThrottled();
+    turretFired(engine, x, y, target.x, target.y);
     engine.projectiles.push({
       id: Math.random().toString(36), x: x + 0.5, y: y + 0.5,
       targetX: target.x, targetY: target.y, targetId: target.id,
@@ -379,6 +399,15 @@ function applyHitEffects(engine: GameEngine, target: Enemy, p: { damage: number;
     const hitEvent = fireOnHit(engine, p.sourceX, p.sourceY, target, p.damage, false, p.modType ?? 0);
     finalDmg = hitEvent.damage;
   }
+  // Enemy shield absorbs damage first
+  if (target.enemyShield && target.enemyShield > 0) {
+    const absorbed = Math.min(finalDmg, target.enemyShield);
+    target.enemyShield -= absorbed;
+    finalDmg -= absorbed;
+    if (absorbed > 0) {
+      engine.addDamageNumber(target.x, target.y - 0.3, absorbed, '#3498db');
+    }
+  }
   target.health -= finalDmg;
   engine.addDamageNumber(target.x, target.y, finalDmg, p.color);
   if (p.sourceX !== undefined && p.sourceY !== undefined) {
@@ -391,7 +420,7 @@ export function updateProjectiles(engine: GameEngine) {
     const dx = p.targetX - p.x;
     const dy = p.targetY - p.y;
     const d = Math.sqrt(dx * dx + dy * dy);
-    if (d < 0.3) {
+    if (d < PROJECTILE_HIT_THRESHOLD) {
       if (p.splash && p.splash > 0) {
         const toRemove: string[] = [];
         engine.enemies.forEach(e => {
@@ -512,17 +541,18 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
 
     if (tile !== undefined && tile !== TileType.EMPTY && tile !== TileType.ORE_PATCH) {
       if (timestamp - e.lastHit > 1000) {
-        let dmg = engine.diffConfig.enemyDamage;
+        const typeDef = ENEMY_TYPES[e.enemyType || 'normal'];
+        let dmg = Math.floor(engine.diffConfig.enemyDamage * typeDef.damageMult);
 
         // ── Absorber module: nearby walls with ABSORBER reduce incoming damage ──
-        const absorbR = 3;
+        const absorbR = ABSORBER_RANGE;
         let absorbMult = 1;
         for (let ay = Math.max(0, ty - absorbR); ay <= Math.min(engine.grid.size - 1, ty + absorbR); ay++) {
           for (let ax = Math.max(0, tx - absorbR); ax <= Math.min(engine.grid.size - 1, tx + absorbR); ax++) {
             if (ax === tx && ay === ty) continue;
             if (engine.grid.modules[ay]?.[ax] === ModuleType.ABSORBER) {
               const dist = Math.sqrt(Math.pow(ax - tx, 2) + Math.pow(ay - ty, 2));
-              if (dist <= absorbR) { absorbMult = 0.75; break; }
+              if (dist <= absorbR) { absorbMult = ABSORBER_DAMAGE_MULT; break; }
             }
           }
           if (absorbMult < 1) break;
@@ -542,15 +572,15 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
           // ── Thorns module: reflect 15% damage back to enemy ──
           const tileModule = engine.grid.modules[ty]?.[tx];
           if (tileModule === ModuleType.THORNS) {
-            const reflectDmg = Math.floor(engine.diffConfig.enemyDamage * 0.15);
-            e.hp -= reflectDmg;
+            const reflectDmg = Math.floor(engine.diffConfig.enemyDamage * THORNS_REFLECT_FRACTION);
+            e.health -= reflectDmg;
             engine.addDamageNumber(e.x, e.y - 0.3, reflectDmg, '#d63031');
           }
 
           // ── Wall Slow module: slow attacking enemy by 30% for 4s ──
           if (tileModule === ModuleType.WALL_SLOW) {
-            e.slowedUntil = Date.now() + 4000;
-            e.slowFactor = 0.7;
+            e.slowedUntil = timestamp + WALL_SLOW_DURATION_MS;
+            e.slowFactor = WALL_SLOW_FACTOR;
           }
 
           // Notify nearby buildings that an ally was damaged
@@ -635,7 +665,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     }
 
     // Slow-on-hit module — slowFactor stored on enemy by onHit hook
-    const moduleSlowFactor = (e.slowedUntil && Date.now() < e.slowedUntil && e.slowFactor) ? e.slowFactor : 1;
+    const moduleSlowFactor = (e.slowedUntil && timestamp < e.slowedUntil && e.slowFactor) ? e.slowFactor : 1;
 
     // Gravity Cannon — pull enemies toward cannon + additional slow
     let gravitySlow = 1;
@@ -661,9 +691,58 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     const dx = engine.grid.coreX + 0.5 - e.x;
     const dy = engine.grid.coreY + 0.5 - e.y;
     const d = Math.sqrt(dx * dx + dy * dy);
+
+    // ── Pathfinding movement ──
+    let moveX = 0, moveY = 0;
+
+    // Repath if grid changed since path was assigned
+    if (e.pathGeneration !== undefined && e.pathGeneration !== engine.grid.pathGeneration) {
+      const gridX = Math.min(Math.max(0, Math.floor(e.x)), engine.grid.size - 1);
+      const gridY = Math.min(Math.max(0, Math.floor(e.y)), engine.grid.size - 1);
+      const newPath = engine.grid.findPath(gridX, gridY);
+      if (newPath && newPath.length > 0) {
+        e.path = newPath;
+        e.pathIndex = 0;
+      } else {
+        e.path = undefined;
+        e.pathIndex = undefined;
+      }
+      e.pathGeneration = engine.grid.pathGeneration;
+    }
+
+    if (e.path && e.path.length > 0 && e.pathIndex !== undefined) {
+      const wp = e.path[e.pathIndex];
+      if (wp) {
+        const wpDx = wp.x + 0.5 - e.x;
+        const wpDy = wp.y + 0.5 - e.y;
+        const wpD = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
+        // Advance through waypoints we've already passed
+        if (wpD < PATHFINDING_WAYPOINT_THRESHOLD) {
+          e.pathIndex++;
+          if (e.pathIndex >= e.path.length) {
+            e.path = undefined;
+            e.pathIndex = undefined;
+          }
+        }
+        if (wpD > 0.05) {
+          moveX = wpDx / wpD;
+          moveY = wpDy / wpD;
+        }
+      } else {
+        // Invalid waypoint index
+        e.path = undefined;
+        e.pathIndex = undefined;
+      }
+    }
+    // Fallback: beeline if no path
+    if (moveX === 0 && moveY === 0 && d > 0.1) {
+      moveX = dx / d;
+      moveY = dy / d;
+    }
+
     if (d > 0.1) {
-      e.x += (dx / d) * e.speed * slowFactor * moduleSlowFactor * gravitySlow;
-      e.y += (dy / d) * e.speed * slowFactor * moduleSlowFactor * gravitySlow;
+      e.x += moveX * e.speed * slowFactor * moduleSlowFactor * gravitySlow;
+      e.y += moveY * e.speed * slowFactor * moduleSlowFactor * gravitySlow;
     }
     return true;
   });

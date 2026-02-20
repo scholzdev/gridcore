@@ -61,8 +61,8 @@ export const BuildSidebar = ({
         <BuildBtn type={TileType.QUANTUM_FACTORY} selected={sel} set={set} label="Quantenfabrik" cost={getCostString(TileType.QUANTUM_FACTORY)} color="#7209b7" affordable={canAffordBuilding(TileType.QUANTUM_FACTORY)} locked={!unlockedBuildings.has(TileType.QUANTUM_FACTORY)} />
       </BuildGroup>
       <BuildGroup label="Forschung">
-        <BuildBtn type={TileType.LAB} selected={selectedBuilding} set={set} label="Forschungslabor" cost={getCostString(TileType.LAB)} color="#54a0ff" affordable={canAffordBuilding(TileType.LAB)} locked={!unlockedBuildings.has(TileType.LAB)} />
-        <BuildBtn type={TileType.DATA_VAULT} selected={selectedBuilding} set={set} label="Datentresor" cost={getCostString(TileType.DATA_VAULT)} color="#00cec9" affordable={canAffordBuilding(TileType.DATA_VAULT)} locked={!unlockedBuildings.has(TileType.DATA_VAULT)} />
+        <BuildBtn type={TileType.LAB} selected={sel} set={set} label="Forschungslabor" cost={getCostString(TileType.LAB)} color="#54a0ff" affordable={canAffordBuilding(TileType.LAB)} locked={!unlockedBuildings.has(TileType.LAB)} />
+        <BuildBtn type={TileType.DATA_VAULT} selected={sel} set={set} label="Datentresor" cost={getCostString(TileType.DATA_VAULT)} color="#00cec9" affordable={canAffordBuilding(TileType.DATA_VAULT)} locked={!unlockedBuildings.has(TileType.DATA_VAULT)} />
       </BuildGroup>
     </div>
   );

@@ -142,13 +142,107 @@ const RESOURCE_DROP: MapEvent = {
   apply: (engine) => {
     const resources = ['scrap', 'steel', 'electronics', 'energy'] as const;
     const pick = resources[Math.floor(rng(engine) * resources.length)];
-    const amounts: Record<string, number> = { scrap: 300, steel: 100, electronics: 60, energy: 200 };
-    const amount = amounts[pick];
+    const baseAmounts: Record<string, number> = { scrap: 300, steel: 100, electronics: 60, energy: 200 };
+    const amount = Math.floor(baseAmounts[pick] + engine.gameTime * 2);
     engine.resources.add({ [pick]: amount });
     const names: Record<string, string> = { scrap: 'Schrott', steel: 'Stahl', electronics: 'Elektronik', energy: 'Energie' };
-    // Override notification with specific info
     engine.addEventNotification(`+${amount} ${names[pick]}!`, '#2ecc71');
   },
+};
+
+const ENEMY_SWARM: MapEvent = {
+  id: 'enemy_swarm',
+  name: '🐝 Schwarmattacke',
+  description: '15 Schwarm-Gegner erscheinen sofort!',
+  color: '#fdcb6e',
+  duration: 0,
+  apply: (engine) => {
+    for (let i = 0; i < 15; i++) {
+      const s = engine.grid.size;
+      const side = Math.floor(rng(engine) * 4);
+      let x = 0, y = 0;
+      if (side === 0) { x = rng(engine) * s; y = 0; }
+      if (side === 1) { x = s - 1; y = rng(engine) * s; }
+      if (side === 2) { x = rng(engine) * s; y = s - 1; }
+      if (side === 3) { x = 0; y = rng(engine) * s; }
+      const minutes = engine.gameTime / 60;
+      const hp = engine.diffConfig.baseHp * 0.3 * Math.pow(1.05, minutes * 10);
+      const speed = Math.min(0.12, engine.diffConfig.baseSpeed * 1.5);
+      engine.enemies.push({
+        id: `swarm${Date.now()}${i}`, x, y, health: hp, maxHealth: hp, speed,
+        lastHit: 0, enemyType: 'swarm',
+      });
+    }
+  },
+};
+
+const SHIELD_SURGE: MapEvent = {
+  id: 'shield_surge',
+  name: '🛡 Schildwelle',
+  description: 'Alle Schilde werden verdoppelt!',
+  color: '#74b9ff',
+  duration: 20,
+  apply: (engine) => {
+    const size = engine.grid.size;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (engine.grid.shields[y][x] > 0) {
+          engine.grid.shields[y][x] *= 2;
+        }
+      }
+    }
+  },
+};
+
+const TECH_SALVAGE: MapEvent = {
+  id: 'tech_salvage',
+  name: '🔧 Technologie-Fund',
+  description: 'Geborgene Technologie: +15 KP!',
+  color: '#9b59b6',
+  duration: 0,
+  apply: (engine) => {
+    const bonus = 15 + Math.floor(engine.gameTime / 60) * 5;
+    engine.killPoints += bonus;
+    engine.addEventNotification(`+${bonus} KP!`, '#9b59b6');
+  },
+};
+
+const RADIATION_LEAK: MapEvent = {
+  id: 'radiation_leak',
+  name: '☢ Strahlungsleck',
+  description: 'Gebäude in einem Bereich nehmen Schaden!',
+  color: '#00b894',
+  duration: 0,
+  apply: (engine) => {
+    const size = engine.grid.size;
+    const cx = Math.floor(rng(engine) * (size - 6)) + 3;
+    const cy = Math.floor(rng(engine) * (size - 6)) + 3;
+    const radius = 3;
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+        if (Math.sqrt(dx * dx + dy * dy) > radius) continue;
+        const type = engine.grid.tiles[ny][nx];
+        if (type === TileType.CORE) continue; // Don't touch core
+        if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
+          const maxHP = engine.grid.healths[ny][nx];
+          const dmg = Math.floor(maxHP * 0.25);
+          engine.grid.healths[ny][nx] -= dmg;
+          engine.addDamageNumber(nx + 0.5, ny + 0.5, dmg, '#00b894');
+        }
+      }
+    }
+  },
+};
+
+const OVERCHARGE_EVENT: MapEvent = {
+  id: 'overcharge_event',
+  name: '⚡ Energiestoß',
+  description: 'Alle Türme feuern 50% schneller!',
+  color: '#f39c12',
+  duration: 15,
+  apply: () => { /* handled by checking active event in combat */ },
 };
 
 export const ALL_EVENTS: MapEvent[] = [
@@ -156,6 +250,11 @@ export const ALL_EVENTS: MapEvent[] = [
   METEOR_RAIN,
   ORE_DISCOVERY,
   RESOURCE_DROP,
+  ENEMY_SWARM,
+  SHIELD_SURGE,
+  TECH_SALVAGE,
+  RADIATION_LEAK,
+  OVERCHARGE_EVENT,
 ];
 
 // ── Event State ──────────────────────────────────────────────

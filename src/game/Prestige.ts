@@ -6,6 +6,9 @@ export interface PrestigeBonuses {
   startScrapLvl: number;
   startEnergyLvl: number;
   costReductionLvl: number;
+  hpLvl: number;
+  researchSpeedLvl: number;
+  abilityLvl: number;
 }
 
 export interface PrestigeData {
@@ -28,6 +31,9 @@ export const PRESTIGE_UPGRADES: PrestigeUpgradeDef[] = [
   { key: 'startScrapLvl', name: 'Schrottvorrat', desc: '+20 Start-Schrott pro Stufe', costBase: 5, maxLevel: 10, effectLabel: '+20' },
   { key: 'startEnergyLvl', name: 'Energievorrat', desc: '+20 Start-Energie pro Stufe', costBase: 5, maxLevel: 10, effectLabel: '+20' },
   { key: 'costReductionLvl', name: 'Ingenieur', desc: '-5% Baukosten pro Stufe', costBase: 15, maxLevel: 10, effectLabel: '-5%' },
+  { key: 'hpLvl', name: 'Panzerung', desc: '+10% Gebäude-HP pro Stufe', costBase: 12, maxLevel: 10, effectLabel: '+10%' },
+  { key: 'researchSpeedLvl', name: 'Gelehrter', desc: '-10% Forschungskosten pro Stufe', costBase: 20, maxLevel: 5, effectLabel: '-10%' },
+  { key: 'abilityLvl', name: 'Anführer', desc: '-10% Ability-Cooldown pro Stufe', costBase: 25, maxLevel: 5, effectLabel: '-10%' },
 ];
 
 export function getUpgradeCost(currentLevel: number, costBase: number): number {
@@ -43,7 +49,7 @@ export function loadPrestige(): PrestigeData {
 }
 
 export function defaultPrestige(): PrestigeData {
-  return { totalPoints: 0, bonuses: { damageLvl: 0, incomeLvl: 0, startScrapLvl: 0, startEnergyLvl: 0, costReductionLvl: 0 } };
+  return { totalPoints: 0, bonuses: { damageLvl: 0, incomeLvl: 0, startScrapLvl: 0, startEnergyLvl: 0, costReductionLvl: 0, hpLvl: 0, researchSpeedLvl: 0, abilityLvl: 0 } };
 }
 
 export function savePrestige(data: PrestigeData) {

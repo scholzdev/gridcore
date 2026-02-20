@@ -1,4 +1,4 @@
-import { RESEARCH_NODES, getResearchLevel, getResearchCost, canResearch } from '../game/Research';
+import { RESEARCH_NODES, TIER_PICK_LIMIT, getResearchLevel, getResearchCost, canResearch, isTierLocked } from '../game/Research';
 import type { ResearchState } from '../game/Research';
 
 interface ResearchOverlayProps {
@@ -29,16 +29,30 @@ export const ResearchOverlay = ({ research, dataAvailable, onResearch, onClose }
         </div>
 
         <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '20px' }}>
-          Investiere Daten in Run-Buffs. Forschung wird bei Game Over zurückgesetzt.
+          Investiere Daten in Run-Buffs. Pro Tier kannst du max. {TIER_PICK_LIMIT} von 3 Forschungen wählen. Forschung wird bei Game Over zurückgesetzt.
         </div>
 
         {tiers.map(tier => {
           const nodes = RESEARCH_NODES.filter(n => n.tier === tier);
           if (nodes.length === 0) return null;
+          const pickedCount = nodes.filter(n => getResearchLevel(research, n.id) >= 1).length;
+          const showBranchInfo = nodes.length > TIER_PICK_LIMIT;
           return (
             <div key={tier} style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#7f8c8d', textTransform: 'uppercase', marginBottom: '8px' }}>
-                Tier {tier}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#7f8c8d', textTransform: 'uppercase' }}>
+                  Tier {tier}
+                </span>
+                {showBranchInfo && (
+                  <span style={{
+                    fontSize: '10px', padding: '1px 6px', borderRadius: '4px',
+                    backgroundColor: pickedCount >= TIER_PICK_LIMIT ? '#e74c3c20' : '#3498db20',
+                    color: pickedCount >= TIER_PICK_LIMIT ? '#e74c3c' : '#3498db',
+                    fontWeight: 'bold',
+                  }}>
+                    {pickedCount}/{TIER_PICK_LIMIT} gewählt
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {nodes.map(node => {
@@ -48,36 +62,46 @@ export const ResearchOverlay = ({ research, dataAvailable, onResearch, onClose }
                   const available = canResearch(research, node, dataAvailable);
                   const reqNode = node.requires ? RESEARCH_NODES.find(n => n.id === node.requires) : null;
                   const reqMet = !node.requires || getResearchLevel(research, node.requires) >= 1;
+                  const locked = isTierLocked(research, node);
 
                   return (
                     <div key={node.id} style={{
                       display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
-                      borderRadius: '8px', backgroundColor: maxed ? '#f0fff0' : '#f8f9fa',
-                      border: `1px solid ${maxed ? '#27ae60' : reqMet ? '#dfe4ea' : '#e74c3c30'}`,
-                      opacity: reqMet ? 1 : 0.55,
+                      borderRadius: '8px',
+                      backgroundColor: locked ? '#f8f9fa' : maxed ? '#f0fff0' : '#f8f9fa',
+                      border: `1px solid ${locked ? '#e74c3c40' : maxed ? '#27ae60' : reqMet ? '#dfe4ea' : '#e74c3c30'}`,
+                      opacity: locked ? 0.45 : reqMet ? 1 : 0.55,
                     }}>
                       <div style={{
                         width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-                        backgroundColor: node.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: locked ? '#b2bec3' : node.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '10px', fontWeight: 'bold', color: '#fff'
                       }}>
-                        {level}
+                        {locked ? '🔒' : level}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#2d3436' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: locked ? '#b2bec3' : '#2d3436' }}>
                           {node.name}
                           <span style={{ fontSize: '11px', fontWeight: 'normal', color: '#7f8c8d', marginLeft: '6px' }}>
                             {level}/{node.maxLevel}
                           </span>
                         </div>
                         <div style={{ fontSize: '11px', color: '#636e72', marginTop: '2px' }}>{node.description}</div>
-                        {!reqMet && reqNode && (
+                        {locked && (
+                          <div style={{ fontSize: '10px', color: '#e74c3c', marginTop: '2px' }}>
+                            Gesperrt — bereits {TIER_PICK_LIMIT} Forschungen in Tier {node.tier} gewählt
+                          </div>
+                        )}
+                        {!reqMet && !locked && reqNode && (
                           <div style={{ fontSize: '10px', color: '#e74c3c', marginTop: '2px' }}>
                             Benötigt: {reqNode.name}
                           </div>
                         )}
                       </div>
-                      {!maxed ? (
+                      {locked ? (
+                        <span style={{ fontSize: '12px', color: '#b2bec3', fontWeight: 'bold' }}>🔒</span>
+                      ) : !maxed ? (
                         <button onClick={() => onResearch(node.id)} disabled={!available} style={{
                           padding: '5px 12px', borderRadius: '6px', cursor: available ? 'pointer' : 'not-allowed',
                           border: '1px solid #dfe4ea', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace',
@@ -95,7 +119,7 @@ export const ResearchOverlay = ({ research, dataAvailable, onResearch, onClose }
                         {Array.from({ length: node.maxLevel }, (_, i) => (
                           <div key={i} style={{
                             width: '8px', height: '8px', borderRadius: '50%',
-                            backgroundColor: i < level ? node.color : '#dfe4ea',
+                            backgroundColor: i < level ? node.color : locked ? '#dfe4ea80' : '#dfe4ea',
                           }} />
                         ))}
                       </div>

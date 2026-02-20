@@ -5,6 +5,7 @@ import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS, STARTER_BUILDINGS, B
 import type { TechNode } from './config';
 import { loadPrestige, savePrestige, resetPrestige, getUpgradeCost, getAvailablePoints, PRESTIGE_UPGRADES } from './game/Prestige';
 import type { PrestigeData, PrestigeBonuses } from './game/Prestige';
+import { getWaveComposition } from './game/types';
 import { StartScreen } from './components/StartScreen';
 import { TopBar } from './components/TopBar';
 import { BuildSidebar } from './components/BuildSidebar';
@@ -22,8 +23,12 @@ import { AbilityBar } from './components/AbilityBar';
 import { playBuild, playSell, playUpgrade, playModuleInstall, isMuted, toggleMute } from './game/Sound';
 import type { MarketState } from './game/Market';
 import type { ResearchState } from './game/Research';
+import { GRID_SIZE, MAX_GAME_SPEED, LEVEL_SCALING } from './constants';
 import { createAbilityState } from './game/Abilities';
 import type { AbilityState } from './game/Abilities';
+import { TutorialOverlay } from './components/TutorialOverlay';
+import { createTutorialState, getCurrentStep, advanceTutorial, skipTutorial, TUTORIAL_STEPS } from './game/Tutorial';
+import type { TutorialState } from './game/Tutorial';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,6 +45,7 @@ function App() {
   const [paused, setPaused] = useState(false);
   const [placingCore, setPlacingCore] = useState(true);
   const [netIncome, setNetIncome] = useState({ energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 });
+  const [resourceBreakdown, setResourceBreakdown] = useState<Record<string, { type: number; x: number; y: number; amount: number }[]>>({});
   const [isGameOver, setIsGameOver] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('leicht');
   const [gameMode, setGameMode] = useState<GameMode>('endlos');
@@ -69,10 +75,64 @@ function App() {
   const [showGuide, setShowGuide] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [scoreSubmitted, setScoreSubmitted] = useState(false);
-  const [soundMuted, setSoundMuted] = useState(isMuted);
-  const [marketState, setMarketState] = useState<MarketState>({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
+  const [soundMuted, setSoundMuted] = useState(isMuted());
+  const [marketState, setMarketState] = useState<MarketState>({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1, energy: 1 } });
   const [researchState, setResearchState] = useState<ResearchState>({ levels: {} });
   const [abilityState, setAbilityState] = useState<AbilityState>(() => createAbilityState());
+  const [gameSpeed, setGameSpeed] = useState(1);
+  const [tutorial, setTutorial] = useState<TutorialState>(() => createTutorialState());
+
+  // ── Tutorial Logic ─────────────────────────────────────────
+
+  // Check tutorial conditions each frame
+  useEffect(() => {
+    if (!tutorial.active || !engineRef.current) return;
+    const step = getCurrentStep(tutorial);
+    if (!step || step.manualAdvance) return;
+    const check = () => {
+      if (!engineRef.current) return;
+      if (step.condition(engineRef.current)) {
+        setTutorial(prev => advanceTutorial(prev));
+      }
+    };
+    const id = setInterval(check, 200);
+    return () => clearInterval(id);
+  }, [tutorial.active, tutorial.stepIndex]);
+
+  // Run onEnter when step changes
+  useEffect(() => {
+    if (!tutorial.active || !engineRef.current) return;
+    const step = getCurrentStep(tutorial);
+    if (step?.onEnter) step.onEnter(engineRef.current);
+    if (step?.forceSelect) setSelectedBuilding(step.forceSelect);
+  }, [tutorial.stepIndex, tutorial.active]);
+
+  // Freeze wave build timer while tutorial is active (so waves don't auto-start)
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.tutorialPaused = tutorial.active;
+    }
+  }, [tutorial.active, tutorial.stepIndex]);
+
+  const handleTutorialAdvance = () => {
+    setTutorial(prev => {
+      const next = advanceTutorial(prev);
+      // If next step has onEnter or forceSelect, they'll be handled by the effect above
+      return next;
+    });
+  };
+
+  const handleTutorialSkip = () => {
+    setTutorial(skipTutorial());
+    if (engineRef.current) engineRef.current.tutorialPaused = false;
+  };
+
+  const handleStartTutorial = () => {
+    setDifficulty('leicht');
+    setGameMode('wellen');
+    setTutorial({ active: true, stepIndex: 0, completed: false });
+    setGameStarted(true);
+  };
 
   // ── Game Loop ──────────────────────────────────────────────
 
@@ -97,6 +157,7 @@ function App() {
 
       setGameStats({ time: engineRef.current.gameTime, killed: engineRef.current.enemiesKilled });
       setNetIncome({ ...engineRef.current.netIncome });
+      setResourceBreakdown(engineRef.current.resourceBreakdown);
       setIsGameOver(engineRef.current.gameOver);
       setKillPoints(engineRef.current.killPoints);
       setUnlockedBuildings(new Set(engineRef.current.unlockedBuildings));
@@ -202,9 +263,10 @@ function App() {
     setShowResearch(false);
     setShowLeaderboard(false);
     setScoreSubmitted(false);
-    setMarketState({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1 } });
+    setMarketState({ prices: { scrap: 1, steel: 1, electronics: 1, data: 1, energy: 1 } });
     setResearchState({ levels: {} });
     setAbilityState(createAbilityState());
+    setTutorial(createTutorialState());
   };
 
   const handleUnlock = (node: TechNode) => {
@@ -292,7 +354,7 @@ function App() {
     const worldX = Math.floor((e.clientX - rect.left) / zoom);
     const worldY = Math.floor((e.clientY - rect.top) / zoom);
 
-    if (worldX >= 0 && worldX < 30 && worldY >= 0 && worldY < 30) {
+    if (worldX >= 0 && worldX < GRID_SIZE && worldY >= 0 && worldY < GRID_SIZE) {
       // Set hover for range display
       engineRef.current.hoverGridX = worldX;
       engineRef.current.hoverGridY = worldY;
@@ -301,7 +363,7 @@ function App() {
       if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
         const level = engineRef.current.grid.levels[worldY][worldX] || 1;
         const stats = BUILDING_STATS[type] || {};
-        const mult = 1 + (level - 1) * 0.5;
+        const mult = 1 + (level - 1) * LEVEL_SCALING;
         const scaledIncome = stats.income ? {
           energy: stats.income.energy ? Math.floor(stats.income.energy * mult * 10) / 10 : undefined,
           scrap: stats.income.scrap ? Math.floor(stats.income.scrap * mult * 10) / 10 : undefined,
@@ -365,6 +427,11 @@ function App() {
       if (upgradeCost && engineRef.current.resources.canAfford(upgradeCost)) {
         if (engineRef.current.grid.upgradeBuilding(worldX, worldY)) {
           engineRef.current.resources.spend(upgradeCost);
+          // Apply prestige HP bonus to upgraded building
+          const hpMult = engineRef.current.prestigeHpMult;
+          if (hpMult > 1) {
+            engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
+          }
           playUpgrade();
           setResources({ ...engineRef.current.resources.state });
         }
@@ -374,6 +441,11 @@ function App() {
       if (engineRef.current.resources.canAfford(cost)) {
         if (engineRef.current.grid.placeBuilding(worldX, worldY, selectedBuilding)) {
           engineRef.current.resources.spend(cost);
+          // Apply prestige HP bonus
+          const hpMult = engineRef.current.prestigeHpMult;
+          if (hpMult > 1) {
+            engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
+          }
           engineRef.current.purchasedCounts[selectedBuilding] = (engineRef.current.purchasedCounts[selectedBuilding] || 0) + 1;
           engineRef.current.buildingsPlaced++;
           playBuild();
@@ -442,6 +514,7 @@ function App() {
         setGameStarted={setGameStarted}
         seed={gameSeed}
         setSeed={setGameSeed}
+        onStartTutorial={handleStartTutorial}
       />
     );
   }
@@ -497,6 +570,15 @@ function App() {
       {showGuide && (
         <GuideOverlay onClose={() => setShowGuide(false)} />
       )}
+      {tutorial.active && getCurrentStep(tutorial) && (
+        <TutorialOverlay
+          step={getCurrentStep(tutorial)!}
+          stepIndex={tutorial.stepIndex}
+          totalSteps={TUTORIAL_STEPS.length}
+          onAdvance={handleTutorialAdvance}
+          onSkip={handleTutorialSkip}
+        />
+      )}
       {showLeaderboard && (
         <LeaderboardOverlay
           onClose={() => setShowLeaderboard(false)}
@@ -522,9 +604,12 @@ function App() {
         coreHealth={coreHealth}
         resources={resources}
         netIncome={netIncome}
+        resourceBreakdown={resourceBreakdown}
         killPoints={killPoints}
         showTechTree={showTechTree}
         waveInfo={waveInfo}
+        gameSpeed={gameSpeed}
+        nextWavePreview={gameMode === 'wellen' && waveInfo.buildPhase ? getWaveComposition(waveInfo.wave + 1) : null}
         onTogglePause={togglePause}
         onRestart={handleRestart}
         onToggleTechTree={() => setShowTechTree(prev => !prev)}
@@ -535,11 +620,20 @@ function App() {
         onToggleGuide={() => setShowGuide(prev => !prev)}
         onToggleLeaderboard={() => setShowLeaderboard(prev => !prev)}
         onToggleMute={() => setSoundMuted(toggleMute())}
+        onToggleSpeed={() => {
+          if (!engineRef.current) return;
+          const next = gameSpeed >= MAX_GAME_SPEED ? 1 : gameSpeed + 1;
+          engineRef.current.gameSpeed = next;
+          setGameSpeed(next);
+        }}
         isMuted={soundMuted}
         onSave={handleSave}
         onLoad={handleLoad}
         hasSave={hasSave}
         seed={gameSeed}
+        onHighlightResource={(res: string | null) => {
+          if (engineRef.current) engineRef.current.highlightResource = res;
+        }}
       />
 
       {!placingCore && (

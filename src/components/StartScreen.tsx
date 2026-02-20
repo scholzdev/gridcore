@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DIFFICULTY_PRESETS } from '../game/types';
 import type { Difficulty, GameMode } from '../game/types';
+import { hasTutorialBeenCompleted } from '../game/Tutorial';
 
 interface StartScreenProps {
   gameMode: GameMode;
@@ -9,10 +10,12 @@ interface StartScreenProps {
   setGameStarted: (b: boolean) => void;
   seed: string;
   setSeed: (s: string) => void;
+  onStartTutorial: () => void;
 }
 
-export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStarted, seed, setSeed }: StartScreenProps) => {
+export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStarted, seed, setSeed, onStartTutorial }: StartScreenProps) => {
   const [showSeed, setShowSeed] = useState(false);
+  const tutorialDone = hasTutorialBeenCompleted();
 
   return (
   <div style={{
@@ -65,6 +68,28 @@ export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStart
         );
       })}
     </div>
+
+    {/* Tutorial Button */}
+    <button
+      onClick={onStartTutorial}
+      style={{
+        width: '320px', padding: '14px 24px', cursor: 'pointer',
+        borderRadius: '10px', fontSize: '15px', fontWeight: 'bold',
+        fontFamily: 'monospace',
+        backgroundColor: tutorialDone ? 'transparent' : '#00d2d3',
+        color: tutorialDone ? '#00d2d3' : '#fff',
+        border: '2px solid #00d2d3',
+        transition: 'all 0.15s',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#00d2d3'; e.currentTarget.style.color = '#fff'; }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = tutorialDone ? 'transparent' : '#00d2d3';
+        e.currentTarget.style.color = tutorialDone ? '#00d2d3' : '#fff';
+      }}
+    >
+      🎓 {tutorialDone ? 'Tutorial wiederholen' : 'Tutorial starten'}
+    </button>
 
     {/* Seed Input */}
     <div style={{ textAlign: 'center' }}>

@@ -1,7 +1,52 @@
 import { TileType, ModuleType } from '../config';
-import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, getMaxHP } from '../config';
+import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, BUILDING_STATS, getMaxHP } from '../config';
 import type { Enemy, Drone, LaserBeam, DamageNumber } from './types';
+import { ENEMY_TYPES } from './types';
 import type { GameEngine } from './Engine';
+
+// Building icons/glyphs for visual clarity
+const BUILDING_ICONS: Partial<Record<number, string>> = {
+  [TileType.SOLAR_PANEL]: '⚡',
+  [TileType.MINER]: '⛏',
+  [TileType.WALL]: '▣',
+  [TileType.TURRET]: '⌖',
+  [TileType.HEAVY_TURRET]: '⊕',
+  [TileType.TESLA_COIL]: '϶',
+  [TileType.PLASMA_CANNON]: '◎',
+  [TileType.LASER_TURRET]: '⊙',
+  [TileType.ARTILLERY]: '⊗',
+  [TileType.ION_CANNON]: '⊛',
+  [TileType.ANNIHILATOR]: '✹',
+  [TileType.CORE]: '◆',
+  [TileType.REPAIR_BAY]: '+',
+  [TileType.SHIELD_GENERATOR]: '◇',
+  [TileType.SLOW_FIELD]: '◌',
+  [TileType.RADAR_STATION]: '◉',
+  [TileType.DRONE_HANGAR]: '▲',
+  [TileType.STEEL_SMELTER]: '♨',
+  [TileType.FOUNDRY]: '⚒',
+  [TileType.FABRICATOR]: '⚙',
+  [TileType.RECYCLER]: '♻',
+  [TileType.FUSION_REACTOR]: '☢',
+  [TileType.HYPER_REACTOR]: '★',
+  [TileType.LAB]: '🔬',
+  [TileType.CRYSTAL_DRILL]: '◈',
+  [TileType.DATA_VAULT]: '▤',
+  [TileType.MINEFIELD]: '✕',
+  [TileType.ENERGY_RELAY]: '↯',
+  [TileType.COMMAND_CENTER]: '⚑',
+  [TileType.NANITE_DOME]: '◍',
+  [TileType.GRAVITY_CANNON]: '❂',
+  [TileType.QUANTUM_FACTORY]: '⬡',
+  [TileType.SHOCKWAVE_TOWER]: '⟐',
+};
+
+// Buildings that have a rotating turret barrel
+const TURRET_TYPES = new Set<number>([
+  TileType.TURRET, TileType.HEAVY_TURRET, TileType.TESLA_COIL,
+  TileType.PLASMA_CANNON, TileType.LASER_TURRET, TileType.ARTILLERY,
+  TileType.ION_CANNON, TileType.ANNIHILATOR, TileType.GRAVITY_CANNON,
+]);
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -43,10 +88,45 @@ export class Renderer {
 
         if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
           ctx.fillStyle = TILE_COLORS[type] || '#ff00ff';
-          this.drawBuildingRect(px, py, zoom, level);
+          this.drawBuildingRect(px, py, zoom, level, type);
+
+          // Turret barrel — rotates toward last target
+          if (TURRET_TYPES.has(type) && engine.turretAngles[y]?.[x] !== undefined) {
+            const angle = engine.turretAngles[y][x];
+            const cx = px + zoom / 2;
+            const cy = py + zoom / 2;
+            const barrelLen = zoom * 0.38;
+            const barrelW = zoom * 0.08;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(0, -barrelW, barrelLen, barrelW * 2);
+            // Barrel tip highlight
+            ctx.fillStyle = TILE_COLORS[type] || '#636e72';
+            ctx.fillRect(barrelLen - barrelW * 2, -barrelW * 1.2, barrelW * 2 + 1, barrelW * 2.4);
+            ctx.restore();
+          }
 
           const p = zoom / 8;
           const s = zoom - p * 2;
+
+          // Resource highlight glow
+          if (engine.highlightResource) {
+            const stats = BUILDING_STATS[type];
+            const res = engine.highlightResource;
+            const produces = stats?.income && (stats.income as any)[res];
+            const consumes = stats?.consumes && (stats.consumes as any)[res];
+            if (produces || consumes) {
+              ctx.save();
+              ctx.globalAlpha = 0.3 + 0.15 * Math.sin(Date.now() / 200);
+              ctx.shadowColor = produces ? '#2ecc71' : '#e74c3c';
+              ctx.shadowBlur = zoom * 0.6;
+              ctx.fillStyle = produces ? 'rgba(46,204,113,0.25)' : 'rgba(231,76,60,0.2)';
+              ctx.fillRect(px + p, py + p, s, s);
+              ctx.restore();
+            }
+          }
 
           // HP bar — only when damaged
           const hp = grid.healths[y][x];
@@ -99,6 +179,21 @@ export class Renderer {
       ctx.globalAlpha = p.life / 15;
       ctx.fillRect(p.x * zoom - 2, p.y * zoom - 2, 4, 4);
       ctx.globalAlpha = 1;
+    });
+
+    // Muzzle flashes
+    engine.muzzleFlashes.forEach(f => {
+      const alpha = f.life / 6;
+      const r = zoom * 0.22 * alpha;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = '#f1c40f';
+      ctx.shadowBlur = zoom * 0.3;
+      ctx.beginPath();
+      ctx.arc(f.x * zoom, f.y * zoom, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     });
 
     // Laser beams
@@ -179,13 +274,75 @@ export class Renderer {
   private drawEnemies(enemies: Enemy[], zoom: number) {
     const { ctx } = this;
     enemies.forEach(e => {
-      const r = zoom / 6;
-      ctx.fillStyle = '#2d3436';
-      ctx.beginPath();
-      ctx.arc(e.x * zoom, e.y * zoom, r, 0, Math.PI * 2);
-      ctx.fill();
-      const barW = zoom / 2;
-      this.drawHealthBar(e.x * zoom - barW / 2, e.y * zoom - r - 6, barW, 5, e.health, e.maxHealth, true);
+      const typeDef = ENEMY_TYPES[e.enemyType || 'normal'];
+      const r = (zoom / 6) * typeDef.sizeMult;
+      ctx.fillStyle = typeDef.color;
+
+      const ex = e.x * zoom;
+      const ey = e.y * zoom;
+
+      if (typeDef.shape === 3) {
+        // Triangle (fast enemies)
+        ctx.beginPath();
+        ctx.moveTo(ex, ey - r);
+        ctx.lineTo(ex - r * 0.87, ey + r * 0.5);
+        ctx.lineTo(ex + r * 0.87, ey + r * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#2d3436';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (typeDef.shape === 4) {
+        // Diamond (tank enemies)
+        ctx.beginPath();
+        ctx.moveTo(ex, ey - r);
+        ctx.lineTo(ex + r, ey);
+        ctx.lineTo(ex, ey + r);
+        ctx.lineTo(ex - r, ey);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#2d3436';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else if (typeDef.shape === 6) {
+        // Hexagon (shielded/boss enemies)
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i - Math.PI / 6;
+          const hx = ex + r * Math.cos(angle);
+          const hy = ey + r * Math.sin(angle);
+          if (i === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#2d3436';
+        ctx.lineWidth = typeDef.type === 'boss' ? 2 : 1;
+        ctx.stroke();
+
+        // Boss glow
+        if (typeDef.type === 'boss') {
+          ctx.shadowColor = typeDef.color;
+          ctx.shadowBlur = 8;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+      } else {
+        // Circle (normal/swarm)
+        ctx.beginPath();
+        ctx.arc(ex, ey, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const barW = Math.max(zoom / 3, r * 2);
+      // HP bar
+      this.drawHealthBar(ex - barW / 2, ey - r - 6, barW, 4, e.health, e.maxHealth, true);
+
+      // Enemy shield bar
+      if (e.enemyShield && e.enemyShieldMax && e.enemyShield > 0) {
+        ctx.fillStyle = '#74b9ff';
+        ctx.fillRect(ex - barW / 2, ey - r - 10, barW * (e.enemyShield / e.enemyShieldMax), 3);
+      }
     });
   }
 
@@ -219,7 +376,7 @@ export class Renderer {
     });
   }
 
-  private drawBuildingRect(px: number, py: number, zoom: number, level: number) {
+  private drawBuildingRect(px: number, py: number, zoom: number, level: number, type?: number) {
     const { ctx } = this;
     const p = zoom / 8;
     const s = zoom - p * 2;
@@ -228,7 +385,16 @@ export class Renderer {
     ctx.fillRect(px + p, py + p, s, s);
     ctx.strokeRect(px + p, py + p, s, s);
 
-    if (level > 1) {
+    // Draw building icon
+    const icon = type !== undefined ? BUILDING_ICONS[type] : undefined;
+    if (icon && level <= 1) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = `${zoom / 2.8}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(icon, px + zoom / 2, py + zoom / 2);
+    } else if (level > 1) {
+      // Level badge
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.font = `bold ${zoom / 2.5}px monospace`;
       ctx.textAlign = 'center';
@@ -237,6 +403,15 @@ export class Renderer {
       ctx.shadowBlur = 4;
       ctx.fillText(`${level}`, px + zoom / 2, py + zoom / 2);
       ctx.shadowBlur = 0;
+
+      // Small icon in corner for leveled buildings
+      if (icon) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = `${zoom / 5}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(icon, px + p + 1, py + p + 1);
+      }
     }
   }
 

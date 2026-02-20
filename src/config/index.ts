@@ -287,7 +287,8 @@ export const scaleVals = (base: number) =>
   [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25].map(m => Math.round(base * m * 10) / 10).join(' / ');
 
 /** Default level scaling: HP multiplier = 1 + (level-1) * LEVEL_SCALING */
-export const LEVEL_SCALING = 0.25;
+import { LEVEL_SCALING } from '../constants';
+export { LEVEL_SCALING } from '../constants';
 
 /** Get the effective max HP for a building at a given level */
 export function getMaxHP(type: number, level: number): number {

@@ -1,6 +1,11 @@
 import type { ResourceState } from './Resources';
+import {
+  MARKET_SELL_PRESSURE, MARKET_BUY_PRESSURE, MARKET_PRICE_MIN,
+  MARKET_PRICE_MAX, MARKET_PRICE_RECOVERY_RATE,
+  TRADE_AMOUNTS as TRADE_AMOUNTS_CONST,
+} from '../constants';
 
-export type TradableResource = 'scrap' | 'steel' | 'electronics' | 'data';
+export type TradableResource = 'scrap' | 'steel' | 'electronics' | 'data' | 'energy';
 
 export interface TradeRoute {
   from: TradableResource;
@@ -18,6 +23,7 @@ export const RESOURCE_LABELS: Record<TradableResource, string> = {
   steel: 'Stahl',
   electronics: 'Elektronik',
   data: 'Daten',
+  energy: 'Energie',
 };
 
 export const RESOURCE_COLORS: Record<TradableResource, string> = {
@@ -25,23 +31,26 @@ export const RESOURCE_COLORS: Record<TradableResource, string> = {
   steel: '#e67e22',
   electronics: '#2ecc71',
   data: '#3498db',
+  energy: '#f1c40f',
 };
 
 export const TRADE_ROUTES: TradeRoute[] = [
   { from: 'scrap', to: 'steel', baseRate: 0.4, label: 'Schrott → Stahl' },
   { from: 'scrap', to: 'electronics', baseRate: 0.25, label: 'Schrott → Elektronik' },
+  { from: 'scrap', to: 'energy', baseRate: 2.0, label: 'Schrott → Energie' },
   { from: 'steel', to: 'electronics', baseRate: 0.5, label: 'Stahl → Elektronik' },
   { from: 'steel', to: 'scrap', baseRate: 2.0, label: 'Stahl → Schrott' },
   { from: 'electronics', to: 'steel', baseRate: 1.5, label: 'Elektronik → Stahl' },
   { from: 'electronics', to: 'data', baseRate: 0.3, label: 'Elektronik → Daten' },
   { from: 'data', to: 'electronics', baseRate: 2.5, label: 'Daten → Elektronik' },
+  { from: 'energy', to: 'scrap', baseRate: 0.4, label: 'Energie → Schrott' },
 ];
 
-export const TRADE_AMOUNTS = [10, 50, 100];
+export const TRADE_AMOUNTS = TRADE_AMOUNTS_CONST;
 
 export function createMarketState(): MarketState {
   return {
-    prices: { scrap: 1, steel: 1, electronics: 1, data: 1 },
+    prices: { scrap: 1, steel: 1, electronics: 1, data: 1, energy: 1 },
   };
 }
 
@@ -68,10 +77,10 @@ export function executeTrade(
   resources[route.to] += output;
 
   // Adjust prices: selling drives price down, buying drives price up
-  const sellPressure = amount * 0.002;
-  const buyPressure = output * 0.003;
-  market.prices[route.from] = Math.max(0.3, market.prices[route.from] - sellPressure);
-  market.prices[route.to] = Math.min(3.0, market.prices[route.to] + buyPressure);
+  const sellPressure = amount * MARKET_SELL_PRESSURE;
+  const buyPressure = output * MARKET_BUY_PRESSURE;
+  market.prices[route.from] = Math.max(MARKET_PRICE_MIN, market.prices[route.from] - sellPressure);
+  market.prices[route.to] = Math.min(MARKET_PRICE_MAX, market.prices[route.to] + buyPressure);
 
   return true;
 }
@@ -80,6 +89,6 @@ export function executeTrade(
 export function tickMarketPrices(market: MarketState) {
   for (const key of Object.keys(market.prices) as TradableResource[]) {
     const diff = 1 - market.prices[key];
-    market.prices[key] += diff * 0.005; // slow recovery
+    market.prices[key] += diff * MARKET_PRICE_RECOVERY_RATE; // slow recovery
   }
 }

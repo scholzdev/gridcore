@@ -66,6 +66,8 @@ export interface GameCtx {
   addTileDamage(x: number, y: number, damage: number): void;
   addTileKill(x: number, y: number): void;
   addParticle(p: Particle): void;
+  /** Get max HP for a building type at given level */
+  getMaxHP(type: number, level: number): number;
 
   // ── Research buffs ───────────────
   researchBuffs: {
