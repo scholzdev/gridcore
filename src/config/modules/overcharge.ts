@@ -14,7 +14,8 @@ export const OVERCHARGE_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.RECYCLER,
   hooks: {
     onResourceGained(event) {
-      event.incomeMult *= 1.6;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.incomeMult *= 1 + 0.6 * m;
     },
   },
 };

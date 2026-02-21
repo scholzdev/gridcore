@@ -90,6 +90,8 @@ export function detonateMines(engine: GameEngine) {
         e.health -= mineDmg;
         engine.addDamageNumber(e.x, e.y, mineDmg, '#d63031');
         engine.addTileDamage(mine.x, mine.y, mineDmg);
+        // Track which mine hit this enemy (for kill attribution)
+        if (!(e as any)._mineSource) (e as any)._mineSource = { x: mine.x, y: mine.y };
       }
     });
     engine.grid.tiles[mine.y][mine.x] = TileType.EMPTY;
@@ -98,6 +100,7 @@ export function detonateMines(engine: GameEngine) {
     engine.grid.shields[mine.y][mine.x] = 0;
     engine.grid.modules[mine.y][mine.x] = 0;
     if (engine.purchasedCounts[TileType.MINEFIELD] > 0) engine.purchasedCounts[TileType.MINEFIELD]--;
+    engine.cleanupTile(mine.x, mine.y);
     // Big mine explosion
     for (let i = 0; i < 20; i++) {
       const angle = (Math.PI * 2 / 20) * i + (Math.random() - 0.5) * 0.2;
@@ -108,12 +111,11 @@ export function detonateMines(engine: GameEngine) {
   });
 
   if (toDetonate.length > 0) {
-    engine.enemies = engine.enemies.filter(e => {
-      if (e.health <= 0) {
-        killEnemy(engine, e, toDetonate[0].x, toDetonate[0].y);
-        return false;
-      }
-      return true;
+    const deadEnemies = engine.enemies.filter(e => e.health <= 0);
+    engine.enemies = engine.enemies.filter(e => e.health > 0);
+    deadEnemies.forEach(e => {
+      const src = (e as any)._mineSource || toDetonate[0];
+      killEnemy(engine, e, src.x, src.y);
     });
   }
 }
@@ -185,6 +187,7 @@ export function turretLogic(engine: GameEngine) {
         const pulseDmg = (BUILDING_STATS[type].damage!) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
         const pulseR = cfg.combat.pulseRadius;
         let hitAny = false;
+        const pulseKilled: Enemy[] = [];
         for (const e of engine.enemies) {
           const dist = Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2));
           if (dist <= pulseR) {
@@ -192,12 +195,17 @@ export function turretLogic(engine: GameEngine) {
             hitAny = true;
             engine.addDamageNumber(e.x, e.y, pulseDmg, cfg.color);
             if (e.health <= 0) {
-              killEnemy(engine, e, x, y);
-              fireOnKill(engine, x, y, e);
+              pulseKilled.push(e);
             } else {
               fireOnHit(engine, x, y, e, pulseDmg, false, 0);
             }
           }
+        }
+        // Remove dead enemies from pulse damage
+        if (pulseKilled.length > 0) {
+          const killedIds = new Set(pulseKilled.map(e => e.id));
+          engine.enemies = engine.enemies.filter(e => !killedIds.has(e.id));
+          pulseKilled.forEach(e => killEnemy(engine, e, x, y));
         }
         if (hitAny) {
           // Visual: shockwave ring
@@ -240,6 +248,7 @@ export function turretLogic(engine: GameEngine) {
 
         // Hit all enemies within 1.5 tiles of the beam line
         const beamWidth = 1.5;
+        const beamKilled: Enemy[] = [];
         for (const e of engine.enemies) {
           // Project enemy position onto beam line
           const ex = e.x - x;
@@ -254,12 +263,17 @@ export function turretLogic(engine: GameEngine) {
             e.health -= beamDmg;
             engine.addDamageNumber(e.x, e.y, beamDmg, cfg.color);
             if (e.health <= 0) {
-              killEnemy(engine, e, x, y);
-              fireOnKill(engine, x, y, e);
+              beamKilled.push(e);
             } else {
               fireOnHit(engine, x, y, e, beamDmg, true, 0);
             }
           }
+        }
+        // Remove dead enemies from beam damage
+        if (beamKilled.length > 0) {
+          const killedIds = new Set(beamKilled.map(e => e.id));
+          engine.enemies = engine.enemies.filter(e => !killedIds.has(e.id));
+          beamKilled.forEach(e => killEnemy(engine, e, x, y));
         }
 
         // Visual: laser beam across map
@@ -281,14 +295,23 @@ export function turretLogic(engine: GameEngine) {
       const level = engine.grid.levels[y][x] || 1;
       const stats = BUILDING_STATS[type];
       const mod = engine.grid.modules[y][x];
-      const baseRange = (stats.range || 6) + radarBuff[y][x];
+      const baseRange = (stats.range || 6) + radarBuff[y][x] + engine.researchBuffs.rangeBuff;
       const mult = getLevelMult(level);
       const baseDmg = (stats.damage!) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
       let baseFireChance = (cfg.combat.fireChance ?? 0.9) - fireRateBuff[y][x];
 
+      // Research: fire rate improvement (fireRateMult < 1 means faster firing)
+      baseFireChance *= engine.researchBuffs.fireRateMult;
+
       // Overcharge ability: double fire rate (halve fireChance threshold)
       if (isAbilityActive(engine.abilities, 'overcharge')) {
         baseFireChance *= 0.5;
+      }
+
+      // Overcharge map event: 50% faster fire rate
+      const eventBoost = (engine as any)._eventFireRateBoost || 0;
+      if (eventBoost > 0) {
+        baseFireChance *= (1 - eventBoost);
       }
 
       // Fire onCombatTick — hooks (building + module) can mutate damage, fireChance, effectiveRange
@@ -404,9 +427,11 @@ function fireProjectile(engine: GameEngine, x: number, y: number, range: number,
 function applyHitEffects(engine: GameEngine, target: Enemy, p: { damage: number; modType?: number; sourceX?: number; sourceY?: number; color: string }) {
   // Fire onHit interceptor — module hooks can modify damage, apply slow, chain, etc.
   let finalDmg = p.damage;
+  let isCrit = false;
   if (p.sourceX !== undefined && p.sourceY !== undefined) {
     const hitEvent = fireOnHit(engine, p.sourceX, p.sourceY, target, p.damage, false, p.modType ?? 0);
     finalDmg = hitEvent.damage;
+    isCrit = !!(hitEvent as any)._isCrit;
   }
   // Enemy shield absorbs damage first
   if (target.enemyShield && target.enemyShield > 0) {
@@ -418,7 +443,7 @@ function applyHitEffects(engine: GameEngine, target: Enemy, p: { damage: number;
     }
   }
   target.health -= finalDmg;
-  engine.addDamageNumber(target.x, target.y, finalDmg, p.color);
+  engine.addDamageNumber(target.x, target.y, finalDmg, isCrit ? '#f1c40f' : p.color);
   if (p.sourceX !== undefined && p.sourceY !== undefined) {
     engine.addTileDamage(p.sourceX, p.sourceY, finalDmg);
   }
@@ -630,6 +655,8 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
                     engine.grid.tiles[ey][ex] = ORE_BUILDINGS.includes(nType) ? TileType.ORE_PATCH : TileType.EMPTY;
                     engine.grid.levels[ey][ex] = 0;
                     engine.grid.shields[ey][ex] = 0;
+                    engine.grid.modules[ey][ex] = 0;
+                    engine.cleanupTile(ex, ey);
                   }
                 }
               }
@@ -649,6 +676,10 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
           engine.grid.tiles[ty][tx] = ORE_BUILDINGS.includes(tile) ? TileType.ORE_PATCH : TileType.EMPTY;
           engine.grid.levels[ty][tx] = 0;
           engine.grid.shields[ty][tx] = 0;
+          engine.grid.modules[ty][tx] = 0;
+          if (engine.purchasedCounts[tile] > 0) engine.purchasedCounts[tile]--;
+          engine.cleanupTile(tx, ty);
+          engine.grid.invalidatePaths();
         }
       }
       return true;

@@ -70,13 +70,13 @@ export function isTierLocked(state: ResearchState, node: ResearchNode): boolean 
   return false;
 }
 
-export function canResearch(state: ResearchState, node: ResearchNode, dataAvailable: number): boolean {
+export function canResearch(state: ResearchState, node: ResearchNode, dataAvailable: number, costMult: number = 1): boolean {
   const level = getResearchLevel(state, node.id);
   if (level >= node.maxLevel) return false;
   if (node.requires && getResearchLevel(state, node.requires) < 1) return false;
   // Tier branching lock
   if (isTierLocked(state, node)) return false;
-  return dataAvailable >= getResearchCost(node, level);
+  return dataAvailable >= Math.floor(getResearchCost(node, level) * costMult);
 }
 
 /**

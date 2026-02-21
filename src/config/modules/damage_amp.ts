@@ -14,7 +14,8 @@ export const DAMAGE_AMP_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.HEAVY_TURRET,
   hooks: {
     onCombatTick(event) {
-      event.damage *= 1.4;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.damage *= 1 + 0.4 * m;
     },
   },
 };

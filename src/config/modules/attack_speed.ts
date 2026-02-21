@@ -14,7 +14,8 @@ export const ATTACK_SPEED_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.HEAVY_TURRET,
   hooks: {
     onCombatTick(event) {
-      event.fireChance += -0.03;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.fireChance += -0.03 * m;
     },
   },
 };

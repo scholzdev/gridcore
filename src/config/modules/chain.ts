@@ -14,15 +14,21 @@ export const CHAIN_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.TESLA_COIL,
   hooks: {
     onHit(event) {
-      const chainDmg = event.damage * 0.3;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      const chainDmg = event.damage * 0.3 * m;
       const maxTargets = 2;
       const chainRange = 3;
       let count = 0;
+      const killed: typeof event.game.enemies = [];
       for (const e of event.game.enemies) {
         if (e.id === event.enemy.id || count >= maxTargets) continue;
         const dist = Math.sqrt(Math.pow(e.x - event.enemy.x, 2) + Math.pow(e.y - event.enemy.y, 2));
         if (dist <= chainRange) {
           e.health -= chainDmg;
+          event.game.addDamageNumber(e.x, e.y, chainDmg, '#a29bfe');
+          if (e.health <= 0) {
+            killed.push(e);
+          }
           // Chain lightning visual
           event.game.laserBeams.push({
             fromX: event.enemy.x, fromY: event.enemy.y,
@@ -33,6 +39,11 @@ export const CHAIN_CONFIG: ModuleConfig = {
           });
           count++;
         }
+      }
+      // Remove chain-killed enemies
+      if (killed.length > 0) {
+        const killedIds = new Set(killed.map(e => e.id));
+        event.game.enemies = event.game.enemies.filter(e => !killedIds.has(e.id));
       }
     },
   },

@@ -15,9 +15,10 @@ export const CRITICAL_HIT_CONFIG: ModuleConfig = {
   hooks: {
     onHit(event) {
       if (Math.random() < 0.15) {
-        event.damage *= 3;
-        // Gold damage number for crits
-        event.game.addDamageNumber(event.enemy.x, event.enemy.y - 0.3, event.damage, '#f1c40f');
+        const m = event.game.researchBuffs.moduleEffectMult;
+        event.damage *= 1 + 2 * m;
+        // Mark as crit so caller shows gold color (no extra damage number here)
+        (event as any)._isCrit = true;
       }
     },
   },

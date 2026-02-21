@@ -14,7 +14,13 @@ export const PIERCING_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.LASER_TURRET,
   hooks: {
     onHit(event) {
-      event.damage *= 1.5;
+      // Bypass shield scaled by moduleEffectMult
+      if (event.enemy.enemyShield && event.enemy.enemyShield > 0) {
+        const m = event.game.researchBuffs.moduleEffectMult;
+        const bypass = Math.min(event.damage * 0.5 * m, event.enemy.enemyShield);
+        event.enemy.enemyShield -= bypass;
+        event.damage += bypass;
+      }
     },
   },
 };

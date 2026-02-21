@@ -4,11 +4,12 @@ import type { ResearchState } from '../game/Research';
 interface ResearchOverlayProps {
   research: ResearchState;
   dataAvailable: number;
+  costMult?: number;
   onResearch: (nodeId: string) => void;
   onClose: () => void;
 }
 
-export const ResearchOverlay = ({ research, dataAvailable, onResearch, onClose }: ResearchOverlayProps) => {
+export const ResearchOverlay = ({ research, dataAvailable, costMult = 1, onResearch, onClose }: ResearchOverlayProps) => {
   const tiers = [1, 2, 3, 4];
 
   return (
@@ -58,8 +59,8 @@ export const ResearchOverlay = ({ research, dataAvailable, onResearch, onClose }
                 {nodes.map(node => {
                   const level = getResearchLevel(research, node.id);
                   const maxed = level >= node.maxLevel;
-                  const cost = maxed ? 0 : getResearchCost(node, level);
-                  const available = canResearch(research, node, dataAvailable);
+                  const cost = maxed ? 0 : Math.floor(getResearchCost(node, level) * costMult);
+                  const available = canResearch(research, node, dataAvailable, costMult);
                   const reqNode = node.requires ? RESEARCH_NODES.find(n => n.id === node.requires) : null;
                   const reqMet = !node.requires || getResearchLevel(research, node.requires) >= 1;
                   const locked = isTierLocked(research, node);

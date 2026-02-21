@@ -15,7 +15,8 @@ export const DOUBLE_YIELD_CONFIG: ModuleConfig = {
   hooks: {
     onResourceGained(event) {
       if (Math.random() < 0.2) {
-        event.incomeMult *= 2;
+        const m = event.game.researchBuffs.moduleEffectMult;
+        event.incomeMult *= 1 + 1 * m;
       }
     },
   },

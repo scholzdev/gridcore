@@ -15,7 +15,8 @@ export const EFFICIENCY_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.FABRICATOR,
   hooks: {
     onTick(event) {
-      event.consumeMult *= 0.5;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.consumeMult *= Math.max(0.1, 1 - 0.5 * m);
     },
   },
 };

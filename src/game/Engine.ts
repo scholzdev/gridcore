@@ -31,7 +31,7 @@ import { createAbilityState, tickAbilities, activateAbility } from './Abilities'
 import type { AbilityState } from './Abilities';
 import { DIFFICULTY_PRESETS, WAVE_CONFIG, ENEMY_TYPES, getWaveComposition, pickEnemyType, getEndlessEnemyType } from './types';
 import type { TechNode } from './TechTree';
-import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed } from './HookSystem';
+import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed, fireOnPlace, fireOnUpgrade, fireOnRemove } from './HookSystem';
 
 export class GameEngine {
   grid: GameGrid;
@@ -326,6 +326,18 @@ export class GameEngine {
     this.damageNumbers.push({ x, y, amount: Math.round(amount), life: DAMAGE_NUMBER_LIFETIME, color });
   }
 
+  /** Clean up per-tile tracking when a building is destroyed or removed */
+  cleanupTile(x: number, y: number) {
+    const key = `${x},${y}`;
+    this.tileStats.delete(key);
+    this.laserFocus.delete(key);
+  }
+
+  /** Fire building lifecycle hooks */
+  firePlaceHook(x: number, y: number) { fireOnPlace(this, x, y); }
+  fireUpgradeHook(x: number, y: number, prevLevel: number, newLevel: number) { fireOnUpgrade(this, x, y, prevLevel, newLevel); }
+  fireRemoveHook(x: number, y: number, type: number, level: number, refund: Record<string, number>) { fireOnRemove(this, x, y, type, level, refund); }
+
   // ── Save / Load ────────────────────────────────────────────
 
   saveGame() {
@@ -351,6 +363,11 @@ export class GameEngine {
       globalStats: this.globalStats,
       market: this.market,
       research: this.research,
+      seed: this.seed,
+      mapEvents: this.mapEvents,
+      abilities: this.abilities,
+      solarStormMult: this.solarStormMult,
+      nextSpawnTime: this.nextSpawnTime,
     };
     localStorage.setItem('rectangular_save', JSON.stringify(state));
   }
@@ -419,6 +436,16 @@ export class GameEngine {
       if (s.research) {
         this.research = s.research;
         this.researchBuffs = computeResearchBuffs(this.research);
+      }
+
+      // Map Events, Abilities, misc state
+      if (s.mapEvents) this.mapEvents = s.mapEvents;
+      if (s.abilities) this.abilities = s.abilities;
+      if (s.solarStormMult != null) this.solarStormMult = s.solarStormMult;
+      if (s.nextSpawnTime != null) this.nextSpawnTime = s.nextSpawnTime;
+      if (s.seed) {
+        this.seed = s.seed;
+        this.spawnRng = mulberry32(seedToNumber(this.seed) + SPAWN_RNG_OFFSET);
       }
 
       return true;
@@ -615,127 +642,139 @@ export class GameEngine {
       for (let sx = 0; sx < size; sx++)
         if (this.grid.tiles[sy][sx] === TileType.SOLAR_PANEL) solarCount++;
 
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const type = this.grid.tiles[y][x];
-        if (type === TileType.EMPTY || type === TileType.ORE_PATCH) continue;
-        const level = this.grid.levels[y][x] || 1;
-        const stats = BUILDING_STATS[type];
-        if (!stats) continue;
-        const mult = getLevelMult(level);
+    // Two-pass tick: first process pure producers (no consumes), then consumers.
+    // This ensures energy/resource income is available before consumption checks,
+    // preventing grid-position-dependent activation bugs.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const type = this.grid.tiles[y][x];
+          if (type === TileType.EMPTY || type === TileType.ORE_PATCH) continue;
+          const stats = BUILDING_STATS[type];
+          if (!stats) continue;
 
-        // Fire onTick hook BEFORE consumes — hooks may modify consumeMult & healAmount
-        const tickEvent = fireOnTick(this, x, y, this.gameTime);
+          // Pass 0: only buildings WITHOUT consumes (pure producers / passive)
+          // Pass 1: only buildings WITH consumes
+          const hasConsumes = !!stats.consumes;
+          if (pass === 0 && hasConsumes) continue;
+          if (pass === 1 && !hasConsumes) continue;
 
-        // Consumes (flat — NOT scaled with level, so upgrades don't punish)
-        if (stats.consumes) {
-          const consumes = { ...stats.consumes };
-          // Apply hook-driven consume multiplier (e.g. Efficiency module sets consumeMult = 0.5)
-          if (consumes.energy) consumes.energy *= tickEvent.consumeMult;
-          if (consumes.scrap) consumes.scrap *= tickEvent.consumeMult;
-          if (consumes.electronics) consumes.electronics *= tickEvent.consumeMult;
-          if (consumes.data) consumes.data *= tickEvent.consumeMult;
-          // Research: energy consume reduction
-          if (consumes.energy) consumes.energy *= this.researchBuffs.energyConsumeMult;
-          if (!this.resources.canAfford(consumes)) continue;
-          this.resources.spend(consumes);
-          if (consumes.energy) { tickExpense.energy += consumes.energy; breakdown.energy.push({ type, x, y, amount: -consumes.energy }); }
-          if (consumes.scrap) { tickExpense.scrap += consumes.scrap; breakdown.scrap.push({ type, x, y, amount: -consumes.scrap }); }
-          if (consumes.electronics) { tickExpense.electronics += consumes.electronics; breakdown.electronics.push({ type, x, y, amount: -consumes.electronics }); }
-          if (consumes.data) { tickExpense.data += (consumes.data || 0); breakdown.data.push({ type, x, y, amount: -(consumes.data || 0) }); }
-        }
-        this.activeTiles[y][x] = true;
+          const level = this.grid.levels[y][x] || 1;
+          const mult = getLevelMult(level);
 
-        // Maintenance cost: every building costs scrap per tick based on level
-        if (type !== TileType.CORE) {
-          const maintenance = Math.floor(level * MAINTENANCE_COST_PER_LEVEL);
-          if (maintenance > 0) {
-            this.resources.spend({ scrap: maintenance });
-            tickExpense.scrap += maintenance;
+          // Fire onTick hook BEFORE consumes — hooks may modify consumeMult & healAmount
+          const tickEvent = fireOnTick(this, x, y, this.gameTime);
+
+          // Consumes (flat — NOT scaled with level, so upgrades don't punish)
+          if (stats.consumes) {
+            const consumes = { ...stats.consumes };
+            // Apply hook-driven consume multiplier (e.g. Efficiency module sets consumeMult = 0.5)
+            if (consumes.energy) consumes.energy *= tickEvent.consumeMult;
+            if (consumes.scrap) consumes.scrap *= tickEvent.consumeMult;
+            if (consumes.electronics) consumes.electronics *= tickEvent.consumeMult;
+            if (consumes.data) consumes.data *= tickEvent.consumeMult;
+            // Research: energy consume reduction
+            if (consumes.energy) consumes.energy *= this.researchBuffs.energyConsumeMult;
+            if (!this.resources.canAfford(consumes)) continue;
+            this.resources.spend(consumes);
+            if (consumes.energy) { tickExpense.energy += consumes.energy; breakdown.energy.push({ type, x, y, amount: -consumes.energy }); }
+            if (consumes.scrap) { tickExpense.scrap += consumes.scrap; breakdown.scrap.push({ type, x, y, amount: -consumes.scrap }); }
+            if (consumes.electronics) { tickExpense.electronics += consumes.electronics; breakdown.electronics.push({ type, x, y, amount: -consumes.electronics }); }
+            if (consumes.data) { tickExpense.data += (consumes.data || 0); breakdown.data.push({ type, x, y, amount: -(consumes.data || 0) }); }
           }
-        }
+          this.activeTiles[y][x] = true;
 
-        // Apply heal from onTick hooks (e.g. Regen module)
-        if (tickEvent.healAmount > 0) {
-          const maxHP = getMaxHP(type, level);
-          this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + tickEvent.healAmount);
-        }
-
-        // Check for self-destruction (e.g. Overdrive Turret losing HP from its own hook)
-        if (this.grid.healths[y][x] <= 0) {
-          fireOnDestroyed(this, x, y, type);
-          this.grid.tiles[y][x] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
-          this.grid.levels[y][x] = 0;
-          this.grid.shields[y][x] = 0;
-          this.grid.modules[y][x] = 0;
-          continue;
-        }
-
-        // Income
-        if (stats.income) {
-          const income = { ...stats.income };
-          // Base multipliers (level + prestige + research)
-          const baseMult = mult * this.prestigeIncomeMult * this.researchBuffs.incomeMult;
-          if (income.energy) income.energy *= baseMult;
-          if (income.scrap) income.scrap *= baseMult;
-          if (income.steel) income.steel *= baseMult;
-          if (income.electronics) income.electronics *= baseMult;
-          if (income.data) income.data *= baseMult;
-
-          // Solar storm event: 3× energy for solar panels
-          if (income.energy && type === TileType.SOLAR_PANEL) {
-            income.energy *= this.solarStormMult;
-            // Diminishing returns: first 15 full output, then -5% per extra (min 30%)
-            if (solarCount > SOLAR_DIMINISHING_THRESHOLD) {
-              const penalty = Math.max(SOLAR_MIN_EFFICIENCY, 1 - (solarCount - SOLAR_DIMINISHING_THRESHOLD) * SOLAR_DIMINISHING_PENALTY);
-              income.energy *= penalty;
+          // Maintenance cost: every building costs scrap per tick based on level
+          if (type !== TileType.CORE) {
+            const maintenance = Math.floor(level * MAINTENANCE_COST_PER_LEVEL);
+            if (maintenance > 0 && this.resources.canAfford({ scrap: maintenance })) {
+              this.resources.spend({ scrap: maintenance });
+              tickExpense.scrap += maintenance;
             }
           }
 
-          // Fire onResourceGained — hooks can modify incomeMult (Overcharge, DoubleYield, Lab dataOutputMult)
-          const rgEvent = fireOnResourceGained(this, x, y, {
-            energy: income.energy || 0, scrap: income.scrap || 0,
-            steel: income.steel || 0, electronics: income.electronics || 0,
-            data: income.data || 0,
-          });
+          // Apply heal from onTick hooks (e.g. Regen module)
+          if (tickEvent.healAmount > 0) {
+            const maxHP = getMaxHP(type, level) * this.researchBuffs.hpMult;
+            this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + tickEvent.healAmount);
+          }
 
-          // Apply hook-driven income multiplier
-          const finalMult = rgEvent.incomeMult;
-          const finalIncome = rgEvent.income;
-          if (finalIncome.energy) { finalIncome.energy *= finalMult; tickIncome.energy += finalIncome.energy; breakdown.energy.push({ type, x, y, amount: finalIncome.energy }); }
-          if (finalIncome.scrap) { finalIncome.scrap *= finalMult; tickIncome.scrap += finalIncome.scrap; breakdown.scrap.push({ type, x, y, amount: finalIncome.scrap }); }
-          if (finalIncome.steel) { finalIncome.steel *= finalMult; tickIncome.steel += finalIncome.steel; breakdown.steel.push({ type, x, y, amount: finalIncome.steel }); }
-          if (finalIncome.electronics) { finalIncome.electronics *= finalMult; tickIncome.electronics += finalIncome.electronics; breakdown.electronics.push({ type, x, y, amount: finalIncome.electronics }); }
-          if (finalIncome.data) { finalIncome.data *= finalMult; tickIncome.data += finalIncome.data; breakdown.data.push({ type, x, y, amount: finalIncome.data }); }
-          this.resources.add(finalIncome);
-        }
+          // Check for self-destruction (e.g. Overdrive Turret losing HP from its own hook)
+          if (this.grid.healths[y][x] <= 0) {
+            fireOnDestroyed(this, x, y, type);
+            this.grid.tiles[y][x] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
+            this.grid.levels[y][x] = 0;
+            this.grid.shields[y][x] = 0;
+            this.grid.modules[y][x] = 0;
+            continue;
+          }
 
-        // ── Generic aura / support effects (config-driven) ──
-        const cfg = BUILDING_REGISTRY[type];
-        if (cfg?.support) {
-          const baseRange = stats.range || 0;
-          const auraEvent = fireOnAuraTick(this, x, y, this.gameTime, baseRange);
-          const auraRange = auraEvent.range;
+          // Income
+          if (stats.income) {
+            const income = { ...stats.income };
+            // Base multipliers (level + prestige + research)
+            const baseMult = mult * this.prestigeIncomeMult * this.researchBuffs.incomeMult;
+            if (income.energy) income.energy *= baseMult;
+            if (income.scrap) income.scrap *= baseMult;
+            if (income.steel) income.steel *= baseMult;
+            if (income.electronics) income.electronics *= baseMult;
+            if (income.data) income.data *= baseMult;
 
-          // Shield aura
-          if (cfg.support.shieldCap && auraRange > 0) {
-            const cap = cfg.support.shieldCap * mult * this.researchBuffs.shieldMult;
-            for (let dy = -auraRange; dy <= auraRange; dy++) {
-              for (let dx = -auraRange; dx <= auraRange; dx++) {
-                const nx = x + dx; const ny = y + dy;
-                if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
-                if (Math.sqrt(dx * dx + dy * dy) > auraRange) continue;
-                const nType = this.grid.tiles[ny][nx];
-                if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
-                  this.grid.shields[ny][nx] = Math.max(this.grid.shields[ny][nx], cap);
+            // Solar storm event: 3× energy for solar panels
+            if (income.energy && type === TileType.SOLAR_PANEL) {
+              income.energy *= this.solarStormMult;
+              // Diminishing returns: first 15 full output, then -5% per extra (min 30%)
+              if (solarCount > SOLAR_DIMINISHING_THRESHOLD) {
+                const penalty = Math.max(SOLAR_MIN_EFFICIENCY, 1 - (solarCount - SOLAR_DIMINISHING_THRESHOLD) * SOLAR_DIMINISHING_PENALTY);
+                income.energy *= penalty;
+              }
+            }
+
+            // Fire onResourceGained — hooks can modify incomeMult (Overcharge, DoubleYield, Lab dataOutputMult)
+            const rgEvent = fireOnResourceGained(this, x, y, {
+              energy: income.energy || 0, scrap: income.scrap || 0,
+              steel: income.steel || 0, electronics: income.electronics || 0,
+              data: income.data || 0,
+            });
+
+            // Apply hook-driven income multiplier
+            const finalMult = rgEvent.incomeMult;
+            const finalIncome = rgEvent.income;
+            if (finalIncome.energy) { finalIncome.energy *= finalMult; tickIncome.energy += finalIncome.energy; breakdown.energy.push({ type, x, y, amount: finalIncome.energy }); }
+            if (finalIncome.scrap) { finalIncome.scrap *= finalMult; tickIncome.scrap += finalIncome.scrap; breakdown.scrap.push({ type, x, y, amount: finalIncome.scrap }); }
+            if (finalIncome.steel) { finalIncome.steel *= finalMult; tickIncome.steel += finalIncome.steel; breakdown.steel.push({ type, x, y, amount: finalIncome.steel }); }
+            if (finalIncome.electronics) { finalIncome.electronics *= finalMult; tickIncome.electronics += finalIncome.electronics; breakdown.electronics.push({ type, x, y, amount: finalIncome.electronics }); }
+            if (finalIncome.data) { finalIncome.data *= finalMult; tickIncome.data += finalIncome.data; breakdown.data.push({ type, x, y, amount: finalIncome.data }); }
+            this.resources.add(finalIncome);
+          }
+
+          // ── Generic aura / support effects (config-driven) ──
+          const cfg = BUILDING_REGISTRY[type];
+          if (cfg?.support) {
+            const baseRange = stats.range || 0;
+            const auraEvent = fireOnAuraTick(this, x, y, this.gameTime, baseRange);
+            const auraRange = auraEvent.range;
+
+            // Shield aura
+            if (cfg.support.shieldCap && auraRange > 0) {
+              const cap = cfg.support.shieldCap * mult * this.researchBuffs.shieldMult;
+              for (let dy = -auraRange; dy <= auraRange; dy++) {
+                for (let dx = -auraRange; dx <= auraRange; dx++) {
+                  const nx = x + dx; const ny = y + dy;
+                  if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+                  if (Math.sqrt(dx * dx + dy * dy) > auraRange) continue;
+                  const nType = this.grid.tiles[ny][nx];
+                  if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
+                    this.grid.shields[ny][nx] = Math.max(this.grid.shields[ny][nx], cap);
+                  }
                 }
               }
             }
-          }
 
-          // Global damage buff
-          if (cfg.support.damageBuff) {
-            this.dataVaultBuff += cfg.support.damageBuff * mult;
+            // Global damage buff
+            if (cfg.support.damageBuff) {
+              this.dataVaultBuff += cfg.support.damageBuff * mult;
+            }
           }
         }
       }
@@ -774,7 +813,7 @@ export class GameEngine {
   buyResearch(nodeId: string): boolean {
     const node = RESEARCH_NODES.find(n => n.id === nodeId);
     if (!node) return false;
-    if (!canResearch(this.research, node, this.resources.state.data)) return false;
+    if (!canResearch(this.research, node, this.resources.state.data, this.prestigeResearchCostMult)) return false;
     const cost = Math.floor(getResearchCost(node, getResearchLevel(this.research, nodeId)) * this.prestigeResearchCostMult);
     this.resources.state.data -= cost;
     this.research.levels[nodeId] = (this.research.levels[nodeId] || 0) + 1;
@@ -804,7 +843,7 @@ export class GameEngine {
           const type = this.grid.tiles[y][x];
           if (type === TileType.EMPTY || type === TileType.ORE_PATCH) continue;
           const level = this.grid.levels[y][x] || 1;
-          const maxHP = getMaxHP(type, level);
+          const maxHP = getMaxHP(type, level) * this.researchBuffs.hpMult;
           const heal = maxHP * EMERGENCY_REPAIR_HEAL_FRACTION;
           this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + heal);
           this.addDamageNumber(x + 0.5, y + 0.3, Math.round(heal), '#27ae60');
@@ -923,7 +962,7 @@ export class GameEngine {
 
   // ── GameCtx interface helpers ──────────────────────────────
   addParticle(p: Particle) { this.particles.push(p); }
-  getMaxHP(type: number, level: number): number { return getMaxHP(type, level); }
+  getMaxHP(type: number, level: number): number { return getMaxHP(type, level) * this.researchBuffs.hpMult; }
 
   addEventNotification(text: string, color: string) {
     this.mapEvents.notifications.push({ text, color, life: EVENT_NOTIFICATION_LIFETIME });

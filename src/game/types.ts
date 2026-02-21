@@ -119,7 +119,7 @@ export const WAVE_CONFIG = {
   /** Base enemy count for wave 1 */
   enemiesBase: 8,
   /** Exponential growth factor per wave */
-  enemiesGrowth: 1.11,
+  enemiesGrowth: 1.067,
   /** Base delay between spawns (ms) */
   spawnDelayBase: 1200,
   /** Delay reduction per wave (ms) */

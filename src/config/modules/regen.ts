@@ -16,7 +16,8 @@ export const REGEN_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.REPAIR_BAY,
   hooks: {
     onTick(event) {
-      event.healAmount += event.building.maxHealth * 0.02;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.healAmount += event.building.maxHealth * 0.02 * m;
     },
   },
 };

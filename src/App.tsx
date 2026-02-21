@@ -169,7 +169,8 @@ function App() {
       const cx = engineRef.current.grid.coreX;
       const cy = engineRef.current.grid.coreY;
       if (cx >= 0 && cy >= 0 && engineRef.current.grid.healths[cy][cx]) {
-        setCoreHealth({ current: engineRef.current.grid.healths[cy][cx], max: BUILDING_STATS[TileType.CORE].maxHealth! });
+        const coreLevel = engineRef.current.grid.levels[cy][cx] || 1;
+        setCoreHealth({ current: engineRef.current.grid.healths[cy][cx], max: engineRef.current.getMaxHP(TileType.CORE, coreLevel) });
       }
 
       setGameStats({ time: engineRef.current.gameTime, killed: engineRef.current.enemiesKilled });
@@ -479,6 +480,8 @@ function App() {
       if (upgradeCost && engineRef.current.resources.canAfford(upgradeCost)) {
         if (engineRef.current.grid.upgradeBuilding(worldX, worldY)) {
           engineRef.current.resources.spend(upgradeCost);
+          const newLevel = engineRef.current.grid.levels[worldY][worldX];
+          engineRef.current.fireUpgradeHook(worldX, worldY, currentLevel, newLevel);
           const hpMult = engineRef.current.prestigeHpMult;
           if (hpMult > 1) {
             engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
@@ -494,6 +497,7 @@ function App() {
       if (engineRef.current.resources.canAfford(cost)) {
         if (engineRef.current.grid.placeBuilding(worldX, worldY, selectedBuilding)) {
           engineRef.current.resources.spend(cost);
+          engineRef.current.firePlaceHook(worldX, worldY);
           const hpMult = engineRef.current.prestigeHpMult;
           if (hpMult > 1) {
             engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
@@ -623,7 +627,9 @@ function App() {
       const removedLevel = engineRef.current.grid.removeBuilding(worldX, worldY);
       if (removedLevel > 0) {
         engineRef.current.resources.add(refund);
+        engineRef.current.fireRemoveHook(worldX, worldY, type, removedLevel, refund);
         if (engineRef.current.purchasedCounts[type] > 0) engineRef.current.purchasedCounts[type]--;
+        engineRef.current.cleanupTile(worldX, worldY);
         playSell();
         setResources({ ...engineRef.current.resources.state });
         refreshTooltip(worldX, worldY);
@@ -718,6 +724,7 @@ function App() {
         <ResearchOverlay
           research={researchState}
           dataAvailable={resources.data}
+          costMult={engineRef.current?.prestigeResearchCostMult}
           onResearch={handleResearch}
           onClose={() => setShowResearch(false)}
         />

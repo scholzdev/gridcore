@@ -16,10 +16,12 @@ export const RANGE_BOOST_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.RADAR_STATION,
   hooks: {
     onCombatTick(event) {
-      event.effectiveRange += 3;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.effectiveRange += 3 * m;
     },
     onAuraTick(event) {
-      event.range += 3;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.range += 3 * m;
     },
   },
 };

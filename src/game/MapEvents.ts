@@ -1,5 +1,6 @@
-import { TileType } from '../config';
+import { TileType, getMaxHP, ORE_BUILDINGS } from '../config';
 import type { GameEngine } from './Engine';
+import { fireOnDestroyed } from './HookSystem';
 
 /** Helper: get the seeded RNG from engine, falling back to Math.random */
 function rng(engine: GameEngine): number {
@@ -76,12 +77,15 @@ const METEOR_RAIN: MapEvent = {
 
       // Destroy building if present
       if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
-        engine.grid.tiles[y][x] = TileType.EMPTY;
+        fireOnDestroyed(engine, x, y, type);
+        engine.grid.tiles[y][x] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
         engine.grid.healths[y][x] = 0;
         engine.grid.shields[y][x] = 0;
         engine.grid.modules[y][x] = 0;
         engine.grid.levels[y][x] = 0;
         if (engine.purchasedCounts[type] > 0) engine.purchasedCounts[type]--;
+        engine.cleanupTile(x, y);
+        engine.grid.invalidatePaths();
       }
 
       // Impact particles
@@ -168,10 +172,22 @@ const ENEMY_SWARM: MapEvent = {
       const minutes = engine.gameTime / 60;
       const hp = engine.diffConfig.baseHp * 0.3 * Math.pow(1.05, minutes * 10);
       const speed = Math.min(0.12, engine.diffConfig.baseSpeed * 1.5);
-      engine.enemies.push({
+      const enemy = {
         id: `swarm${Date.now()}${i}`, x, y, health: hp, maxHealth: hp, speed,
-        lastHit: 0, enemyType: 'swarm',
-      });
+        lastHit: 0, enemyType: 'swarm' as const,
+        path: undefined as { x: number; y: number }[] | undefined,
+        pathIndex: undefined as number | undefined,
+        pathGeneration: engine.grid.pathGeneration,
+      };
+      // Assign path so swarm enemies navigate around buildings
+      const gridX = Math.floor(x);
+      const gridY = Math.floor(y);
+      const path = engine.grid.findPath(gridX, gridY);
+      if (path && path.length > 0) {
+        enemy.path = path;
+        enemy.pathIndex = 0;
+      }
+      engine.enemies.push(enemy);
     }
   },
 };
@@ -226,10 +242,22 @@ const RADIATION_LEAK: MapEvent = {
         const type = engine.grid.tiles[ny][nx];
         if (type === TileType.CORE) continue; // Don't touch core
         if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
-          const maxHP = engine.grid.healths[ny][nx];
+          const level = engine.grid.levels[ny][nx] || 1;
+          const maxHP = getMaxHP(type, level);
           const dmg = Math.floor(maxHP * 0.25);
           engine.grid.healths[ny][nx] -= dmg;
           engine.addDamageNumber(nx + 0.5, ny + 0.5, dmg, '#00b894');
+          // Destroy building if HP drops to 0
+          if (engine.grid.healths[ny][nx] <= 0) {
+            fireOnDestroyed(engine, nx, ny, type);
+            engine.grid.tiles[ny][nx] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
+            engine.grid.levels[ny][nx] = 0;
+            engine.grid.shields[ny][nx] = 0;
+            engine.grid.modules[ny][nx] = 0;
+            if (engine.purchasedCounts[type] > 0) engine.purchasedCounts[type]--;
+            engine.cleanupTile(nx, ny);
+            engine.grid.invalidatePaths();
+          }
         }
       }
     }
@@ -242,7 +270,12 @@ const OVERCHARGE_EVENT: MapEvent = {
   description: 'Alle Türme feuern 50% schneller!',
   color: '#f39c12',
   duration: 15,
-  apply: () => { /* handled by checking active event in combat */ },
+  apply: (engine) => {
+    (engine as any)._eventFireRateBoost = 0.5;
+  },
+  remove: (engine) => {
+    (engine as any)._eventFireRateBoost = 0;
+  },
 };
 
 export const ALL_EVENTS: MapEvent[] = [

@@ -14,8 +14,9 @@ export const SLOW_HIT_CONFIG: ModuleConfig = {
   requiresUnlock: TileType.SLOW_FIELD,
   hooks: {
     onHit(event) {
-      event.enemy.slowedUntil = Date.now() + 3000;
-      event.enemy.slowFactor = 0.7;
+      const m = event.game.researchBuffs.moduleEffectMult;
+      event.enemy.slowedUntil = performance.now() + 3000;
+      event.enemy.slowFactor = Math.max(0.1, 1 - 0.3 * m);
     },
   },
 };
