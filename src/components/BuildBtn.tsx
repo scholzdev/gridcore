@@ -17,9 +17,10 @@ interface BuildBtnProps {
   color: string;
   affordable?: boolean;
   locked?: boolean;
+  onHighlight?: (type: number) => void;
 }
 
-export const BuildBtn = ({ type, selected, set, label, cost, color, affordable = true, locked = false }: BuildBtnProps) => {
+export const BuildBtn = ({ type, selected, set, label, cost, color, affordable = true, locked = false, onHighlight }: BuildBtnProps) => {
   const [hover, setHover] = React.useState(false);
   const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
   const [shift, setShift] = React.useState(false);
@@ -67,7 +68,7 @@ export const BuildBtn = ({ type, selected, set, label, cost, color, affordable =
   const showScaling = hover && shift;
 
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}>
+    <div onMouseEnter={() => { setHover(true); onHighlight?.(type); }} onMouseLeave={() => { setHover(false); onHighlight?.(-1); }} onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}>
       <button onClick={affordable ? () => set(type) : undefined} disabled={!affordable} style={{
         padding: '12px', backgroundColor: selected === type ? '#f1f2f6' : 'transparent',
         border: selected === type ? `2px solid ${color}` : '1px solid #dfe4ea',

@@ -158,7 +158,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'place_walls',
     title: '🧱 Mauern platzieren',
-    message: 'Baue mindestens 3 Mauern. Lass Lücken für deine Türme!\nTipp: Gegner müssen um Mauern herumlaufen.',
+    message: 'Baue mindestens 3 Mauern. Lass Lücken für deine Türme!\nTipp: Halte die Maustaste gedrückt und ziehe, um schnell mehrere Mauern zu setzen!\nGegner müssen um Mauern herumlaufen.',
     position: 'right',
     arrow: 'left',
     highlight: { kind: 'canvas' },
@@ -193,7 +193,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'wave_survived',
     title: '🎉 Welle überstanden!',
-    message: 'Gut gemacht! Du hast die erste Welle überlebt.\nIn der Bauphase kannst du deine Basis ausbauen.\nTipp: Klicke mit dem gleichen Gebäudetyp auf ein bestehendes Gebäude um es zu upgraden!',
+    message: 'Gut gemacht! Du hast die erste Welle überlebt.\nIn der Bauphase kannst du deine Basis ausbauen und upgraden!\n\n⬆️ Upgrade-Tipp: Wähle einen Gebäudetyp und klicke auf das gleiche Gebäude!',
     position: 'center',
     arrow: 'none',
     highlight: { kind: 'none' },
@@ -203,7 +203,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'explain_upgrade',
     title: '⬆️ Gebäude upgraden',
-    message: 'Wähle das Solarfeld und klicke auf eins deiner bestehenden Solarfelder.\nUpgrades erhöhen Produktion und HP um 50% pro Level (max 5).',
+    message: 'So funktioniert Upgraden:\n1. Wähle den Gebäudetyp in der Sidebar (z.B. Solarfeld)\n2. Klicke auf ein BESTEHENDES Gebäude desselben Typs\n→ Level steigt, +25% Produktion/Schaden pro Level!\n\nUpgrade jetzt eines deiner Solarfelder!',
     position: 'right',
     arrow: 'left',
     highlight: { kind: 'canvas' },

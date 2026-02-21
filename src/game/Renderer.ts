@@ -1,7 +1,7 @@
 import { TileType, ModuleType } from '../config';
-import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, BUILDING_STATS, getMaxHP } from '../config';
+import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, BUILDING_STATS, getMaxHP, ORE_BUILDINGS } from '../config';
 import type { Enemy, Drone, LaserBeam, DamageNumber } from './types';
-import { ENEMY_TYPES } from './types';
+import { ENEMY_TYPES, WAVE_CONFIG } from './types';
 import type { GameEngine } from './Engine';
 
 // Building icons/glyphs for visual clarity
@@ -65,12 +65,16 @@ export class Renderer {
     ctx.fillStyle = '#f1f2f6';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // World-space rendering (panned)
+    ctx.save();
+    ctx.translate(engine.panX, engine.panY);
+
     // Grid lines
     ctx.strokeStyle = '#dfe4ea';
     ctx.lineWidth = 1;
     for (let i = 0; i <= grid.size; i++) {
-      ctx.beginPath(); ctx.moveTo(i * zoom, 0); ctx.lineTo(i * zoom, canvas.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i * zoom); ctx.lineTo(canvas.width, i * zoom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i * zoom, 0); ctx.lineTo(i * zoom, grid.size * zoom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * zoom); ctx.lineTo(grid.size * zoom, i * zoom); ctx.stroke();
     }
 
     // Tiles
@@ -82,13 +86,36 @@ export class Renderer {
         const py = y * zoom;
 
         if (type === TileType.ORE_PATCH || (BUILDING_REGISTRY[type]?.requiresOre)) {
-          ctx.fillStyle = TILE_COLORS[TileType.ORE_PATCH];
+          // Ore patch with subtle sparkle
+          const oreGrad = ctx.createRadialGradient(px + zoom / 2, py + zoom / 2, 0, px + zoom / 2, py + zoom / 2, zoom / 2);
+          oreGrad.addColorStop(0, '#d5dbe0');
+          oreGrad.addColorStop(0.6, '#ced6e0');
+          oreGrad.addColorStop(1, '#b2bec3');
+          ctx.fillStyle = oreGrad;
           ctx.fillRect(px + 2, py + 2, zoom - 4, zoom - 4);
+          // Tiny sparkle dots
+          const sparkle = Math.sin(Date.now() / 500 + x * 3 + y * 7) * 0.3 + 0.3;
+          ctx.fillStyle = `rgba(255,255,255,${sparkle})`;
+          ctx.fillRect(px + zoom * 0.3, py + zoom * 0.3, 2, 2);
+          ctx.fillRect(px + zoom * 0.65, py + zoom * 0.55, 2, 2);
         }
 
         if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
           ctx.fillStyle = TILE_COLORS[type] || '#ff00ff';
           this.drawBuildingRect(px, py, zoom, level, type);
+
+          // Core pulsing glow
+          if (type === TileType.CORE) {
+            const pulse = 0.3 + 0.25 * Math.sin(Date.now() / 600);
+            const glowR = zoom * (0.6 + 0.15 * Math.sin(Date.now() / 600));
+            ctx.save();
+            const coreGrad = ctx.createRadialGradient(px + zoom / 2, py + zoom / 2, 0, px + zoom / 2, py + zoom / 2, glowR);
+            coreGrad.addColorStop(0, `rgba(0, 210, 211, ${pulse})`);
+            coreGrad.addColorStop(1, 'rgba(0, 210, 211, 0)');
+            ctx.fillStyle = coreGrad;
+            ctx.fillRect(px - glowR, py - glowR, zoom + glowR * 2, zoom + glowR * 2);
+            ctx.restore();
+          }
 
           // Turret barrel — rotates toward last target
           if (TURRET_TYPES.has(type) && engine.turretAngles[y]?.[x] !== undefined) {
@@ -110,6 +137,17 @@ export class Renderer {
 
           const p = zoom / 8;
           const s = zoom - p * 2;
+
+          // Building type highlight (sidebar hover)
+          if (engine.highlightBuildingType >= 0 && type === engine.highlightBuildingType) {
+            ctx.save();
+            ctx.globalAlpha = 0.35 + 0.2 * Math.sin(Date.now() / 250);
+            ctx.shadowColor = TILE_COLORS[type] || '#fff';
+            ctx.shadowBlur = zoom * 0.7;
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(px + p, py + p, s, s);
+            ctx.restore();
+          }
 
           // Resource highlight glow
           if (engine.highlightResource) {
@@ -162,6 +200,11 @@ export class Renderer {
       }
     }
 
+    // Building ghost preview (translucent preview at cursor)
+    if (!engine.placingCore && !engine.gameOver) {
+      this.drawBuildingGhost(engine, zoom);
+    }
+
     // Enemies
     this.drawEnemies(engine.enemies, zoom);
 
@@ -173,12 +216,19 @@ export class Renderer {
       ctx.fill();
     });
 
-    // Particles
+    // Particles (circles with size variation & glow)
     engine.particles.forEach(p => {
+      const alpha = Math.min(1, p.life / 15);
+      const r = p.size || 2;
+      ctx.save();
+      ctx.globalAlpha = alpha;
       ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.life / 15;
-      ctx.fillRect(p.x * zoom - 2, p.y * zoom - 2, 4, 4);
-      ctx.globalAlpha = 1;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = r * 2;
+      ctx.beginPath();
+      ctx.arc(p.x * zoom, p.y * zoom, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     });
 
     // Muzzle flashes
@@ -208,8 +258,22 @@ export class Renderer {
     // Damage numbers
     this.drawDamageNumbers(engine.damageNumbers, zoom);
 
+    // End world-space rendering
+    ctx.restore();
+
+    // Screen-space UI (not affected by pan)
     // Event notifications
     this.drawEventNotifications(engine);
+
+    // Wave start splash
+    if (engine.waveSplashLife > 0) {
+      this.drawWaveSplash(engine);
+    }
+
+    // Build phase countdown bar
+    if (engine.gameMode === 'wellen' && engine.waveBuildPhase && !engine.placingCore) {
+      this.drawBuildCountdown(engine);
+    }
 
     // Core placement overlay
     if (engine.placingCore) {
@@ -226,20 +290,23 @@ export class Renderer {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Instruction text
+    // Instruction text (screen-space)
     ctx.fillStyle = '#00d2d3';
-    ctx.font = `bold ${Math.max(16, zoom * 0.6)}px monospace`;
+    ctx.font = `bold ${Math.max(16, engine.baseZoom * 0.6)}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = '#000';
     ctx.shadowBlur = 6;
-    ctx.fillText('KERN PLATZIEREN', canvas.width / 2, zoom * 1.5);
-    ctx.font = `${Math.max(12, zoom * 0.4)}px monospace`;
+    ctx.fillText('KERN PLATZIEREN', canvas.width / 2, engine.baseZoom * 1.5);
+    ctx.font = `${Math.max(12, engine.baseZoom * 0.4)}px monospace`;
     ctx.fillStyle = '#ecf0f1';
-    ctx.fillText('Klicke auf das Feld, wo dein Kern stehen soll', canvas.width / 2, zoom * 2.5);
+    ctx.fillText('Klicke auf das Feld, wo dein Kern stehen soll', canvas.width / 2, engine.baseZoom * 2.5);
     ctx.shadowBlur = 0;
 
-    // Hover indicator
+    // Hover indicator (world-space — apply pan)
+    ctx.save();
+    ctx.translate(engine.panX, engine.panY);
+
     if (hx >= 2 && hy >= 2 && hx < engine.grid.size - 2 && hy < engine.grid.size - 2) {
       const isOre = engine.grid.tiles[hy][hx] === TileType.ORE_PATCH;
       const px = hx * zoom;
@@ -258,17 +325,10 @@ export class Renderer {
         ctx.strokeStyle = '#00d2d3';
         ctx.lineWidth = 2;
         ctx.strokeRect(px + 2, py + 2, zoom - 4, zoom - 4);
-
-        // Show a faint 3x3 clear zone indicator
-        ctx.fillStyle = 'rgba(0, 210, 211, 0.1)';
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            ctx.fillRect((hx + dx) * zoom + 1, (hy + dy) * zoom + 1, zoom - 2, zoom - 2);
-          }
-        }
       }
     }
+
+    ctx.restore();
   }
 
   private drawEnemies(enemies: Enemy[], zoom: number) {
@@ -380,38 +440,68 @@ export class Renderer {
     const { ctx } = this;
     const p = zoom / 8;
     const s = zoom - p * 2;
-    ctx.strokeStyle = '#2c3e50';
-    ctx.lineWidth = 2;
-    ctx.fillRect(px + p, py + p, s, s);
-    ctx.strokeRect(px + p, py + p, s, s);
+    const bx = px + p;
+    const by = py + p;
 
-    // Draw building icon
+    // Gradient fill for depth
+    const baseColor = ctx.fillStyle as string;
+    const grad = ctx.createLinearGradient(bx, by, bx + s, by + s);
+    grad.addColorStop(0, baseColor);
+    grad.addColorStop(0.5, baseColor);
+    grad.addColorStop(1, this.darkenColor(baseColor, 0.2));
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, s, s);
+
+    // Inner highlight (top-left shine)
+    const shine = ctx.createLinearGradient(bx, by, bx + s * 0.5, by + s * 0.5);
+    shine.addColorStop(0, 'rgba(255,255,255,0.3)');
+    shine.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shine;
+    ctx.fillRect(bx, by, s, s);
+
+    // Border with slight color variation
+    ctx.strokeStyle = this.darkenColor(baseColor, 0.4);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, s, s);
+
+    // Inner border highlight (subtle 3D effect)
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 1, by + 1, s - 2, s - 2);
+
+    // Draw building icon (always)
     const icon = type !== undefined ? BUILDING_ICONS[type] : undefined;
-    if (icon && level <= 1) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    if (icon) {
+      // Icon shadow for readability
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
       ctx.font = `${zoom / 2.8}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(icon, px + zoom / 2, py + zoom / 2);
-    } else if (level > 1) {
-      // Level badge
+      ctx.fillText(icon, px + zoom / 2 + 0.5, py + zoom / 2 + 0.5);
+      // Icon
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = `bold ${zoom / 2.5}px monospace`;
+      ctx.fillText(icon, px + zoom / 2, py + zoom / 2);
+    }
+
+    // Level badge (top-right corner, shown for level > 1)
+    if (level > 1) {
+      const badgeR = zoom / 5.5;
+      const bx = px + zoom - p - badgeR + 1;
+      const by = py + p + badgeR - 1;
+      // Badge background
+      ctx.fillStyle = level >= 5 ? '#f39c12' : level >= 3 ? '#00d2d3' : '#fff';
+      ctx.beginPath();
+      ctx.arc(bx, by, badgeR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Badge text
+      ctx.fillStyle = level >= 3 ? '#fff' : '#2d3436';
+      ctx.font = `bold ${zoom / 4}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.shadowColor = '#000';
-      ctx.shadowBlur = 4;
-      ctx.fillText(`${level}`, px + zoom / 2, py + zoom / 2);
-      ctx.shadowBlur = 0;
-
-      // Small icon in corner for leveled buildings
-      if (icon) {
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = `${zoom / 5}px monospace`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(icon, px + p + 1, py + p + 1);
-      }
+      ctx.fillText(`${level}`, bx, by + 0.5);
     }
   }
 
@@ -504,6 +594,128 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Translucent ghost of the selected building at cursor position */
+  private drawBuildingGhost(engine: GameEngine, zoom: number) {
+    const { ctx } = this;
+    const hx = engine.hoverGridX;
+    const hy = engine.hoverGridY;
+    if (hx < 0 || hy < 0 || hx >= engine.grid.size || hy >= engine.grid.size) return;
+
+    const currentTile = engine.grid.tiles[hy][hx];
+    const selected = engine.selectedPlacement;
+    // Only show ghost on placeable tiles (not on existing buildings)
+    const isOre = currentTile === TileType.ORE_PATCH;
+    const isEmpty = currentTile === TileType.EMPTY;
+    if (!isEmpty && !isOre) return;
+
+    // Check if placement would be valid
+    const needsOre = ORE_BUILDINGS.includes(selected);
+    const canPlace = needsOre ? isOre : isEmpty;
+
+    const px = hx * zoom;
+    const py = hy * zoom;
+
+    ctx.save();
+    ctx.globalAlpha = canPlace ? 0.45 : 0.3;
+    ctx.fillStyle = canPlace ? (TILE_COLORS[selected] || '#636e72') : '#e74c3c';
+    this.drawBuildingRect(px, py, zoom, 1, selected);
+
+    // Red X overlay for invalid placement
+    if (!canPlace) {
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 3;
+      const p = zoom / 6;
+      ctx.beginPath();
+      ctx.moveTo(px + p, py + p);
+      ctx.lineTo(px + zoom - p, py + zoom - p);
+      ctx.moveTo(px + zoom - p, py + p);
+      ctx.lineTo(px + p, py + zoom - p);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /** Big centered wave number splash that fades out */
+  private drawWaveSplash(engine: GameEngine) {
+    const { ctx, canvas } = this;
+    const life = engine.waveSplashLife;
+    const maxLife = 90;
+    const progress = life / maxLife;
+    // Fade in fast, fade out slow
+    const alpha = life > maxLife * 0.8 ? (maxLife - life) / (maxLife * 0.2) : Math.min(1, progress * 2);
+    // Scale: starts big, settles to normal
+    const scale = 1 + (life > maxLife * 0.7 ? (life - maxLife * 0.7) / (maxLife * 0.3) * 0.3 : 0);
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Dark backdrop
+    const fontSize = Math.max(28, canvas.width / 10) * scale;
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 12;
+
+    // Red-to-orange gradient text
+    const textGrad = ctx.createLinearGradient(canvas.width / 2 - 120, 0, canvas.width / 2 + 120, 0);
+    textGrad.addColorStop(0, '#e74c3c');
+    textGrad.addColorStop(0.5, '#f39c12');
+    textGrad.addColorStop(1, '#e74c3c');
+    ctx.fillStyle = textGrad;
+    ctx.fillText(engine.waveSplashText, canvas.width / 2, canvas.height * 0.35);
+
+    // Subtitle with enemy count
+    ctx.shadowBlur = 4;
+    ctx.globalAlpha = alpha * 0.7;
+    ctx.font = `${Math.max(14, canvas.width / 28)}px monospace`;
+    ctx.fillStyle = '#ecf0f1';
+    ctx.fillText(`${engine.waveEnemiesTotal} Gegner`, canvas.width / 2, canvas.height * 0.35 + fontSize * 0.7);
+
+    ctx.restore();
+  }
+
+  /** Build phase countdown bar at bottom of canvas */
+  private drawBuildCountdown(engine: GameEngine) {
+    const { ctx, canvas } = this;
+    const timer = engine.waveBuildTimer;
+    const maxTime = engine.currentWave === 0 ? WAVE_CONFIG.initialBuildTime : WAVE_CONFIG.betweenWavesBuildTime;
+    const progress = Math.max(0, timer / maxTime);
+
+    const barH = 6;
+    const barW = canvas.width * 0.6;
+    const barX = (canvas.width - barW) / 2;
+    const barY = canvas.height - 20;
+
+    ctx.save();
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+
+    // Progress bar
+    const barColor = progress > 0.3 ? '#00d2d3' : '#e74c3c';
+    const barGrad = ctx.createLinearGradient(barX, 0, barX + barW * progress, 0);
+    barGrad.addColorStop(0, barColor);
+    barGrad.addColorStop(1, progress > 0.3 ? '#0abde3' : '#ff6b6b');
+    ctx.fillStyle = barGrad;
+    ctx.fillRect(barX, barY, barW * progress, barH);
+
+    // Timer text
+    ctx.fillStyle = '#ecf0f1';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 3;
+    const label = engine.currentWave === 0 ? 'BAUPHASE' : `NÄCHSTE WELLE (${engine.currentWave + 1})`;
+    ctx.fillText(`${label} — ${timer}s`, canvas.width / 2, barY - 4);
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+  }
+
   drawGameOver(engine: GameEngine) {
     const { ctx, canvas } = this;
     const w = canvas.width, h = canvas.height;
@@ -539,5 +751,16 @@ export class Renderer {
     ctx.fillStyle = '#7f8c8d';
     ctx.font = `${w / 28}px monospace`;
     ctx.fillText('Drücke R oder klicke Neustart', w / 2, py + w / 16);
+  }
+
+  /** Darken a hex color by a fraction (0-1) */
+  private darkenColor(hex: string, amount: number): string {
+    let color = hex.replace('#', '');
+    if (color.length === 3) color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
+    const num = parseInt(color, 16);
+    const r = Math.max(0, ((num >> 16) & 255) * (1 - amount)) | 0;
+    const g = Math.max(0, ((num >> 8) & 255) * (1 - amount)) | 0;
+    const b = Math.max(0, (num & 255) * (1 - amount)) | 0;
+    return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
   }
 }

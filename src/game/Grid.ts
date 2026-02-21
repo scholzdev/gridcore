@@ -66,14 +66,6 @@ export class GameGrid {
     if (x < CORE_PLACEMENT_MARGIN || y < CORE_PLACEMENT_MARGIN || x >= this.size - CORE_PLACEMENT_MARGIN || y >= this.size - CORE_PLACEMENT_MARGIN) return false;
     // Nicht auf Erz platzieren
     if (this.tiles[y][x] === TileType.ORE_PATCH) return false;
-    // Clear ore patches around core (3x3)
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (this.tiles[y + dy][x + dx] === TileType.ORE_PATCH) {
-          this.tiles[y + dy][x + dx] = TileType.EMPTY;
-        }
-      }
-    }
     this.tiles[y][x] = TileType.CORE;
     this.healths[y][x] = BUILDING_STATS[TileType.CORE].health!;
     this.levels[y][x] = 1;
@@ -156,6 +148,19 @@ export class GameGrid {
     this.modules[y][x] = ModuleType.NONE;
     // Invalidate pathfinding cache & force enemy repath
     this.invalidatePaths();
+    return level;
+  }
+
+  /** Downgrade a building by 1 level. Returns the old level, or 0 if nothing happened. */
+  downgradeBuilding(x: number, y: number): number {
+    if (x < 0 || y < 0 || x >= this.size || y >= this.size) return 0;
+    const type = this.tiles[y][x];
+    if (type === TileType.EMPTY || type === TileType.ORE_PATCH || type === TileType.CORE) return 0;
+    const level = this.levels[y][x];
+    if (level <= 1) return 0; // Use removeBuilding for level 1
+    this.levels[y][x] = level - 1;
+    // Reset HP to new max
+    this.healths[y][x] = getMaxHP(type, level - 1);
     return level;
   }
 

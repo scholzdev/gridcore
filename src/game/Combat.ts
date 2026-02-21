@@ -44,13 +44,22 @@ function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?:
     engine.addTileKill(sourceX, sourceY);
     fireOnKill(engine, sourceX, sourceY, enemy);
   }
-  // Explosion effect — more particles on death
-  const count = 10 + Math.floor(Math.random() * 6);
+  // Explosion effect — burst of particles with size, gravity & enemy-tinted colors
+  const typeDef2 = ENEMY_TYPES[enemy.enemyType || 'normal'];
+  const baseColors = ['#e74c3c', '#f39c12', '#fdcb6e', '#d63031', '#ff7675'];
+  const count = typeDef2.type === 'boss' ? 24 : 14 + Math.floor(Math.random() * 6);
   for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.3;
-    const speed = 0.04 + Math.random() * 0.06;
-    const colors = ['#e74c3c', '#f39c12', '#fdcb6e', '#d63031', '#ff7675'];
-    engine.particles.push({ x: enemy.x, y: enemy.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 15 + Math.floor(Math.random() * 10), color: colors[Math.floor(Math.random() * colors.length)] });
+    const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.4;
+    const speed = 0.03 + Math.random() * 0.07;
+    const color = i % 3 === 0 ? typeDef2.color : baseColors[Math.floor(Math.random() * baseColors.length)];
+    engine.particles.push({
+      x: enemy.x, y: enemy.y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: 18 + Math.floor(Math.random() * 14),
+      color,
+      size: 1.5 + Math.random() * 3,
+      gravity: 0.001 + Math.random() * 0.001,
+    });
   }
 }
 
@@ -752,6 +761,7 @@ export function updateParticles(engine: GameEngine) {
   engine.particles = engine.particles.filter(p => {
     p.x += p.vx;
     p.y += p.vy;
+    if (p.gravity) p.vy += p.gravity;
     p.life--;
     return p.life > 0;
   });

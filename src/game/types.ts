@@ -14,9 +14,9 @@ export interface DifficultyConfig {
 }
 
 export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyConfig> = {
-  leicht: { label: 'Leicht', baseHp: 120, hpPerSec: 4, baseSpeed: 0.018, speedPerSec: 0.00008, spawnBase: 2200, spawnReduction: 15, spawnMin: 500, enemyDamage: 80 },
-  mittel: { label: 'Mittel', baseHp: 180, hpPerSec: 6, baseSpeed: 0.022, speedPerSec: 0.00012, spawnBase: 1800, spawnReduction: 18, spawnMin: 350, enemyDamage: 120 },
-  schwer: { label: 'Schwer', baseHp: 250, hpPerSec: 10, baseSpeed: 0.028, speedPerSec: 0.00018, spawnBase: 1300, spawnReduction: 20, spawnMin: 200, enemyDamage: 180 },
+  leicht: { label: 'Leicht', baseHp: 120, hpPerSec: 4, baseSpeed: 0.018, speedPerSec: 0.00008, spawnBase: 4000, spawnReduction: 15, spawnMin: 500, enemyDamage: 80 },
+  mittel: { label: 'Mittel', baseHp: 180, hpPerSec: 6, baseSpeed: 0.022, speedPerSec: 0.00012, spawnBase: 3000, spawnReduction: 18, spawnMin: 350, enemyDamage: 120 },
+  schwer: { label: 'Schwer', baseHp: 250, hpPerSec: 10, baseSpeed: 0.028, speedPerSec: 0.00018, spawnBase: 2000, spawnReduction: 20, spawnMin: 200, enemyDamage: 180 },
 };
 
 // ── Enemy Types ──────────────────────────────────────────────
@@ -180,6 +180,10 @@ export interface Particle {
   vy: number;
   life: number;
   color: string;
+  /** Particle radius in pixels (default 2) */
+  size?: number;
+  /** Gravity applied to vy each frame */
+  gravity?: number;
 }
 
 export interface Drone {

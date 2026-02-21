@@ -82,6 +82,23 @@ function App() {
   const [gameSpeed, setGameSpeed] = useState(1);
   const [tutorial, setTutorial] = useState<TutorialState>(() => createTutorialState());
 
+  // ── Pan/Zoom & Drag state ──────────────────────────────────
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const isDragPlacing = useRef(false);
+  const lastDragTile = useRef({ x: -1, y: -1 });
+
+  /** Convert screen (canvas-relative) coords to world tile coords */
+  const screenToWorld = (clientX: number, clientY: number): { x: number; y: number } => {
+    if (!engineRef.current || !canvasRef.current) return { x: -1, y: -1 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    const { zoom, panX, panY } = engineRef.current;
+    return {
+      x: Math.floor((clientX - rect.left - panX) / zoom),
+      y: Math.floor((clientY - rect.top - panY) / zoom),
+    };
+  };
+
   // ── Tutorial Logic ─────────────────────────────────────────
 
   // Check tutorial conditions each frame
@@ -200,6 +217,10 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger hotkeys while typing in an input field
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
       if (e.key === 'p' || e.key === 'P') togglePause();
       if (e.key === 'r' || e.key === 'R') { if (engineRef.current?.gameOver) handleRestart(); }
       if (e.key === 't' || e.key === 'T') setShowTechTree(prev => !prev);
@@ -349,10 +370,26 @@ function App() {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!engineRef.current || !isEngineReady) return;
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const { zoom } = engineRef.current;
-    const worldX = Math.floor((e.clientX - rect.left) / zoom);
-    const worldY = Math.floor((e.clientY - rect.top) / zoom);
+
+    // Middle-button panning
+    if (isPanning.current) {
+      const dx = e.clientX - panStart.current.x;
+      const dy = e.clientY - panStart.current.y;
+      engineRef.current.panX = panStart.current.panX + dx;
+      engineRef.current.panY = panStart.current.panY + dy;
+      clampPan();
+      return;
+    }
+
+    const { x: worldX, y: worldY } = screenToWorld(e.clientX, e.clientY);
+
+    // Drag-placement (hold left mouse and drag to paint buildings)
+    if (isDragPlacing.current && worldX >= 0 && worldX < GRID_SIZE && worldY >= 0 && worldY < GRID_SIZE) {
+      if (worldX !== lastDragTile.current.x || worldY !== lastDragTile.current.y) {
+        lastDragTile.current = { x: worldX, y: worldY };
+        tryPlaceBuilding(worldX, worldY);
+      }
+    }
 
     if (worldX >= 0 && worldX < GRID_SIZE && worldY >= 0 && worldY < GRID_SIZE) {
       // Set hover for range display
@@ -387,61 +424,76 @@ function App() {
         setHoverPos({ x: e.clientX + 15, y: e.clientY + 15, show: true });
         return;
       }
+      // On empty/ore tile — hide tooltip but keep hover coords for ghost preview
+      setHoverPos(h => ({ ...h, show: false }));
+      return;
     }
+    // Outside grid — reset everything
     setHoverPos(h => ({ ...h, show: false }));
     if (engineRef.current) { engineRef.current.hoverGridX = -1; engineRef.current.hoverGridY = -1; }
   };
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  /** Refresh tooltip data for the tile at (x, y) — call after upgrade/downgrade */
+  const refreshTooltip = (x: number, y: number) => {
+    if (!engineRef.current) return;
+    const type = engineRef.current.grid.tiles[y][x];
+    if (type === TileType.EMPTY || type === TileType.ORE_PATCH) {
+      setHoverPos(h => ({ ...h, show: false }));
+      return;
+    }
+    const level = engineRef.current.grid.levels[y][x] || 1;
+    const stats = BUILDING_STATS[type] || {};
+    const mult = 1 + (level - 1) * LEVEL_SCALING;
+    const scaledIncome = stats.income ? {
+      energy: stats.income.energy ? Math.floor(stats.income.energy * mult * 10) / 10 : undefined,
+      scrap: stats.income.scrap ? Math.floor(stats.income.scrap * mult * 10) / 10 : undefined,
+      steel: stats.income.steel ? Math.floor(stats.income.steel * mult * 10) / 10 : undefined,
+      electronics: stats.income.electronics ? Math.floor(stats.income.electronics * mult * 10) / 10 : undefined,
+      data: stats.income.data ? Math.floor(stats.income.data * mult * 10) / 10 : undefined,
+    } : undefined;
+    const scaledDamage = stats.damage ? Math.floor(stats.damage * mult * 10) / 10 : undefined;
+    setHoveredData({
+      name: BUILDING_NAMES[type] || TileType[type],
+      stats: { ...stats, income: scaledIncome, damage: scaledDamage },
+      hp: engineRef.current.grid.healths[y][x],
+      shield: engineRef.current.grid.shields[y][x],
+      level,
+      upgradeCost: engineRef.current.getUpgradeCost(type, level),
+      refund: engineRef.current.getRefund(type, level),
+      canRemove: type !== TileType.CORE,
+      module: engineRef.current.grid.modules[y][x],
+      tileType: type
+    });
+  };
+
+  /** Try to place the currently selected building at (worldX, worldY). Used for click + drag. */
+  const tryPlaceBuilding = (worldX: number, worldY: number) => {
     if (!engineRef.current || !isEngineReady) return;
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const { zoom } = engineRef.current;
-    const worldX = Math.floor((e.clientX - rect.left) / zoom);
-    const worldY = Math.floor((e.clientY - rect.top) / zoom);
-
-    // Core placement phase
-    if (engineRef.current.placingCore) {
-      if (engineRef.current.placeCore(worldX, worldY)) {
-        setPlacingCore(false);
-      }
-      return;
-    }
-
+    if (worldX < 0 || worldY < 0 || worldX >= GRID_SIZE || worldY >= GRID_SIZE) return;
+    if (engineRef.current.placingCore || selectedModule !== ModuleType.NONE) return;
     const currentTile = engineRef.current.grid.tiles[worldY][worldX];
-
-    if (selectedModule !== ModuleType.NONE) {
-      const modDef = MODULE_DEFS[selectedModule];
-      if (modDef && engineRef.current.resources.canAfford(modDef.cost)) {
-        if (engineRef.current.grid.installModule(worldX, worldY, selectedModule)) {
-          engineRef.current.resources.spend(modDef.cost);
-          playModuleInstall();
-          setResources({ ...engineRef.current.resources.state });
-        }
-      }
-      return;
-    }
-
+    // Upgrade if same building
     if (currentTile === selectedBuilding && currentTile !== TileType.CORE) {
       const currentLevel = engineRef.current.grid.levels[worldY][worldX];
       const upgradeCost = engineRef.current.getUpgradeCost(currentTile, currentLevel);
       if (upgradeCost && engineRef.current.resources.canAfford(upgradeCost)) {
         if (engineRef.current.grid.upgradeBuilding(worldX, worldY)) {
           engineRef.current.resources.spend(upgradeCost);
-          // Apply prestige HP bonus to upgraded building
           const hpMult = engineRef.current.prestigeHpMult;
           if (hpMult > 1) {
             engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
           }
           playUpgrade();
           setResources({ ...engineRef.current.resources.state });
+          refreshTooltip(worldX, worldY);
         }
       }
     } else {
+      // Place new building
       const cost = engineRef.current.getCurrentCost(selectedBuilding);
       if (engineRef.current.resources.canAfford(cost)) {
         if (engineRef.current.grid.placeBuilding(worldX, worldY, selectedBuilding)) {
           engineRef.current.resources.spend(cost);
-          // Apply prestige HP bonus
           const hpMult = engineRef.current.prestigeHpMult;
           if (hpMult > 1) {
             engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
@@ -455,24 +507,127 @@ function App() {
     }
   };
 
+  /** Clamp pan so the grid doesn't go off-screen */
+  const clampPan = () => {
+    if (!engineRef.current || !canvasRef.current) return;
+    const { zoom, grid } = engineRef.current;
+    const canvasW = canvasRef.current.width;
+    const canvasH = canvasRef.current.height;
+    const gridW = grid.size * zoom;
+    const gridH = grid.size * zoom;
+    // Keep at least half the canvas visible
+    engineRef.current.panX = Math.max(canvasW - gridW, Math.min(0, engineRef.current.panX));
+    engineRef.current.panY = Math.max(canvasH - gridH, Math.min(0, engineRef.current.panY));
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!engineRef.current || !isEngineReady) return;
+    // Middle button → start panning
+    if (e.button === 1) {
+      e.preventDefault();
+      isPanning.current = true;
+      panStart.current = { x: e.clientX, y: e.clientY, panX: engineRef.current.panX, panY: engineRef.current.panY };
+      return;
+    }
+    // Left button → start drag placement
+    if (e.button === 0 && !engineRef.current.placingCore) {
+      isDragPlacing.current = true;
+      const { x, y } = screenToWorld(e.clientX, e.clientY);
+      lastDragTile.current = { x, y };
+    }
+  };
+
+  const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button === 1) isPanning.current = false;
+    if (e.button === 0) isDragPlacing.current = false;
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (!engineRef.current || !canvasRef.current) return;
+    e.preventDefault();
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // World coords under cursor before zoom
+    const worldX = (mouseX - engineRef.current.panX) / engineRef.current.zoom;
+    const worldY = (mouseY - engineRef.current.panY) / engineRef.current.zoom;
+
+    // Adjust zoom
+    const oldZoom = engineRef.current.userZoom;
+    const zoomDelta = e.deltaY > 0 ? -0.15 : 0.15;
+    engineRef.current.userZoom = Math.max(1, Math.min(4, oldZoom + zoomDelta));
+    engineRef.current.zoom = engineRef.current.baseZoom * engineRef.current.userZoom;
+
+    // Adjust pan to keep world point under cursor
+    engineRef.current.panX = mouseX - worldX * engineRef.current.zoom;
+    engineRef.current.panY = mouseY - worldY * engineRef.current.zoom;
+    clampPan();
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!engineRef.current || !isEngineReady) return;
+    // Don't process click if we were panning
+    if (isPanning.current) return;
+
+    const { x: worldX, y: worldY } = screenToWorld(e.clientX, e.clientY);
+
+    // Core placement phase
+    if (engineRef.current.placingCore) {
+      if (engineRef.current.placeCore(worldX, worldY)) {
+        setPlacingCore(false);
+      }
+      return;
+    }
+
+    const currentTile = engineRef.current.grid.tiles[worldY]?.[worldX];
+    if (currentTile === undefined) return;
+
+    if (selectedModule !== ModuleType.NONE) {
+      const modDef = MODULE_DEFS[selectedModule];
+      if (modDef && engineRef.current.resources.canAfford(modDef.cost)) {
+        if (engineRef.current.grid.installModule(worldX, worldY, selectedModule)) {
+          engineRef.current.resources.spend(modDef.cost);
+          playModuleInstall();
+          setResources({ ...engineRef.current.resources.state });
+        }
+      }
+      return;
+    }
+
+    tryPlaceBuilding(worldX, worldY);
+  };
+
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     if (!engineRef.current || !isEngineReady) return;
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const { zoom } = engineRef.current;
-    const worldX = Math.floor((e.clientX - rect.left) / zoom);
-    const worldY = Math.floor((e.clientY - rect.top) / zoom);
+    const { x: worldX, y: worldY } = screenToWorld(e.clientX, e.clientY);
     if (worldX < 0 || worldY < 0 || worldX >= 30 || worldY >= 30) return;
 
     const type = engineRef.current.grid.tiles[worldY][worldX];
     const level = engineRef.current.grid.levels[worldY][worldX] || 1;
-    const refund = engineRef.current.getRefund(type, level);
-    const removedLevel = engineRef.current.grid.removeBuilding(worldX, worldY);
-    if (removedLevel > 0) {
-      engineRef.current.resources.add(refund);
-      if (engineRef.current.purchasedCounts[type] > 0) engineRef.current.purchasedCounts[type]--;
-      playSell();
-      setResources({ ...engineRef.current.resources.state });
+
+    if (level > 1) {
+      // Downgrade by 1 level instead of full removal
+      const refund = engineRef.current.getDowngradeRefund(type, level);
+      const oldLevel = engineRef.current.grid.downgradeBuilding(worldX, worldY);
+      if (oldLevel > 0) {
+        engineRef.current.resources.add(refund);
+        playSell();
+        setResources({ ...engineRef.current.resources.state });
+        refreshTooltip(worldX, worldY);
+      }
+    } else {
+      // Level 1 — fully remove
+      const refund = engineRef.current.getRefund(type, level);
+      const removedLevel = engineRef.current.grid.removeBuilding(worldX, worldY);
+      if (removedLevel > 0) {
+        engineRef.current.resources.add(refund);
+        if (engineRef.current.purchasedCounts[type] > 0) engineRef.current.purchasedCounts[type]--;
+        playSell();
+        setResources({ ...engineRef.current.resources.state });
+        refreshTooltip(worldX, worldY);
+      }
     }
   };
 
@@ -655,16 +810,22 @@ function App() {
           setSelectedModule={setSelectedModule}
           canAffordBuilding={canAffordBuilding}
           getCostString={getCostString}
+          onHighlightBuilding={(type: number) => {
+            if (engineRef.current) engineRef.current.highlightBuildingType = type;
+          }}
         />}
 
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <canvas
             ref={canvasRef}
             onMouseMove={handleMouseMove}
-            onMouseLeave={() => { setHoverPos(h => ({ ...h, show: false })); if (engineRef.current) { engineRef.current.hoverGridX = -1; engineRef.current.hoverGridY = -1; } }}
+            onMouseDown={handleCanvasMouseDown}
+            onMouseUp={handleCanvasMouseUp}
+            onMouseLeave={() => { setHoverPos(h => ({ ...h, show: false })); isPanning.current = false; isDragPlacing.current = false; if (engineRef.current) { engineRef.current.hoverGridX = -1; engineRef.current.hoverGridY = -1; } }}
             onClick={handleCanvasClick}
             onContextMenu={handleContextMenu}
-            style={{ cursor: placingCore ? 'pointer' : 'crosshair', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', borderRadius: '8px' }}
+            onWheel={handleWheel}
+            style={{ cursor: placingCore ? 'pointer' : isPanning.current ? 'grabbing' : 'crosshair', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', borderRadius: '8px' }}
           />
         </div>
 

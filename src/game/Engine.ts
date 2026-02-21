@@ -55,8 +55,15 @@ export class GameEngine {
   turretAngles: number[][] = [];         // Angle each turret is facing
   muzzleFlashes: { x: number; y: number; life: number }[] = [];
 
+  // Wave splash (screen-space overlay text)
+  waveSplashText: string = '';
+  waveSplashLife: number = 0;
+
   // Resource highlight (which resource type to glow on canvas)
   highlightResource: string | null = null;
+
+  // Building type highlight (sidebar hover → glow matching buildings on grid)
+  highlightBuildingType: number = -1;
 
   // Per-resource production breakdown
   resourceBreakdown: Record<string, { type: number; x: number; y: number; amount: number }[]> = {};
@@ -91,6 +98,13 @@ export class GameEngine {
   /** When true, wave build timer is frozen (tutorial is active) */
   tutorialPaused: boolean = false;
   zoom: number = DEFAULT_ZOOM;
+  /** Base zoom (1 tile = baseZoom px, fit to canvas) */
+  baseZoom: number = DEFAULT_ZOOM;
+  /** User zoom multiplier (scroll wheel), 1..4 */
+  userZoom: number = 1;
+  /** Pan offset in pixels */
+  panX: number = 0;
+  panY: number = 0;
   /** Speed multiplier: 1 = normal, 2 = fast, 3 = ultra */
   gameSpeed: number = 1;
 
@@ -178,6 +192,8 @@ export class GameEngine {
     this.waveBuildPhase = false;
     this.waveActive = true;
     this.waveSpawnTimer = 0;
+    this.waveSplashText = `⚔ WELLE ${this.currentWave} ⚔`;
+    this.waveSplashLife = 90; // ~1.5 seconds at 60fps
     playWaveStart();
     fireOnWaveStart(this, this.currentWave, this.waveEnemiesTotal);
   }
@@ -210,6 +226,9 @@ export class GameEngine {
     this.paused = false;
     this.tutorialPaused = false;
     this.gameSpeed = 1;
+    this.userZoom = 1;
+    this.panX = 0;
+    this.panY = 0;
     this.gameTime = 0;
     this.nextSpawnTime = 0;
     this.enemiesKilled = 0;
@@ -217,6 +236,8 @@ export class GameEngine {
     this.activeTiles = [];
     this.turretAngles = [];
     this.muzzleFlashes = [];
+    this.waveSplashText = '';
+    this.waveSplashLife = 0;
     this.resourceBreakdown = {};
     this.netIncome = { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
     this.buildingsPlaced = 0;
@@ -459,12 +480,27 @@ export class GameEngine {
     };
   }
 
+  /** Refund for downgrading 1 level (returns ~40% of that level's upgrade cost) */
+  getDowngradeRefund(type: number, currentLevel: number) {
+    const stats = BUILDING_STATS[type];
+    if (!stats || !stats.cost || currentLevel <= 1) return { energy: 0, scrap: 0, steel: 0, electronics: 0, data: 0 };
+    const factor = UPGRADE_COST_BASE_MULT * Math.pow(UPGRADE_COST_SCALING_BASE, currentLevel - 2);
+    return {
+      energy: Math.floor((stats.cost.energy || 0) * factor * REFUND_PERCENTAGE),
+      scrap: Math.floor((stats.cost.scrap || 0) * factor * REFUND_PERCENTAGE),
+      steel: Math.floor((stats.cost.steel || 0) * factor * REFUND_PERCENTAGE),
+      electronics: Math.floor((stats.cost.electronics || 0) * factor * REFUND_PERCENTAGE),
+      data: Math.floor((stats.cost.data || 0) * factor * REFUND_PERCENTAGE),
+    };
+  }
+
   resize() {
     let size = Math.min(window.innerWidth - SIDEBAR_WIDTH_OFFSET, window.innerHeight - TOPBAR_HEIGHT_OFFSET);
     if (size < CANVAS_MIN_SIZE) size = CANVAS_MIN_SIZE;
     this.canvas.width = size;
     this.canvas.height = size;
-    this.zoom = size / this.grid.size;
+    this.baseZoom = size / this.grid.size;
+    this.zoom = this.baseZoom * this.userZoom;
   }
 
   // ── Main Loop ──────────────────────────────────────────────
@@ -511,7 +547,8 @@ export class GameEngine {
     for (let step = 0; step < speed; step++) {
       // Spawning
       if (this.gameMode === 'endlos') {
-        if (timestamp > this.nextSpawnTime) {
+        // Grace period: no enemies for first 15 seconds
+        if (this.gameTime >= 15 && timestamp > this.nextSpawnTime) {
           this.spawnEnemy();
           const spawnDelay = Math.max(this.diffConfig.spawnMin, this.diffConfig.spawnBase - (this.gameTime * this.diffConfig.spawnReduction));
           this.nextSpawnTime = timestamp + spawnDelay / speed;
@@ -547,6 +584,9 @@ export class GameEngine {
 
     // Update event notifications
     updateEventNotifications(this);
+
+    // Update wave splash
+    if (this.waveSplashLife > 0) this.waveSplashLife--;
 
     // Render
     this.renderer.draw(this);
