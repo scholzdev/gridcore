@@ -30,6 +30,17 @@ function turretFired(engine: GameEngine, tx: number, ty: number, targetX: number
   engine.muzzleFlashes.push({ x: tx + 0.5, y: ty + 0.5, life: 6 });
 }
 
+/** Apply enemy shield absorption — returns the HP damage after shield */
+function applyShield(engine: GameEngine, enemy: Enemy, damage: number): number {
+  if (enemy.enemyShield && enemy.enemyShield > 0) {
+    const absorbed = Math.min(damage, enemy.enemyShield);
+    enemy.enemyShield -= absorbed;
+    damage -= absorbed;
+    if (absorbed > 0) engine.addDamageNumber(enemy.x, enemy.y - 0.3, absorbed, '#3498db');
+  }
+  return damage;
+}
+
 function killEnemy(engine: GameEngine, enemy: Enemy, sourceX?: number, sourceY?: number) {
   if (enemy.dead) return; // Already killed this tick — prevent double-counting
   enemy.dead = true;
@@ -87,9 +98,10 @@ export function detonateMines(engine: GameEngine) {
     engine.enemies.forEach(e => {
       const dist = Math.sqrt(Math.pow(e.x - mine.x - 0.5, 2) + Math.pow(e.y - mine.y - 0.5, 2));
       if (dist <= blastRadius) {
-        e.health -= mineDmg;
-        engine.addDamageNumber(e.x, e.y, mineDmg, '#d63031');
-        engine.addTileDamage(mine.x, mine.y, mineDmg);
+        const mineAfterShield = applyShield(engine, e, mineDmg);
+        e.health -= mineAfterShield;
+        engine.addDamageNumber(e.x, e.y, mineAfterShield, '#d63031');
+        engine.addTileDamage(mine.x, mine.y, mineAfterShield);
         // Track which mine hit this enemy (for kill attribution)
         if (!(e as any)._mineSource) (e as any)._mineSource = { x: mine.x, y: mine.y };
       }
@@ -111,6 +123,7 @@ export function detonateMines(engine: GameEngine) {
   });
 
   if (toDetonate.length > 0) {
+    engine.grid.invalidatePaths();
     const deadEnemies = engine.enemies.filter(e => e.health <= 0);
     engine.enemies = engine.enemies.filter(e => e.health > 0);
     deadEnemies.forEach(e => {
@@ -191,9 +204,10 @@ export function turretLogic(engine: GameEngine) {
         for (const e of engine.enemies) {
           const dist = Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2));
           if (dist <= pulseR) {
-            e.health -= pulseDmg;
+            const dmgAfterShield = applyShield(engine, e, pulseDmg);
+            e.health -= dmgAfterShield;
             hitAny = true;
-            engine.addDamageNumber(e.x, e.y, pulseDmg, cfg.color);
+            engine.addDamageNumber(e.x, e.y, dmgAfterShield, cfg.color);
             if (e.health <= 0) {
               pulseKilled.push(e);
             } else {
@@ -260,8 +274,9 @@ export function turretLogic(engine: GameEngine) {
           const perpY = ey - dot * nDirY;
           const perpDist = Math.sqrt(perpX * perpX + perpY * perpY);
           if (perpDist <= beamWidth) {
-            e.health -= beamDmg;
-            engine.addDamageNumber(e.x, e.y, beamDmg, cfg.color);
+            const dmgAfterShield = applyShield(engine, e, beamDmg);
+            e.health -= dmgAfterShield;
+            engine.addDamageNumber(e.x, e.y, dmgAfterShield, cfg.color);
             if (e.health <= 0) {
               beamKilled.push(e);
             } else {
@@ -393,9 +408,10 @@ function fireBeam(engine: GameEngine, x: number, y: number, range: number, dmg: 
       const baseLaserDmg = dmg * focusMult;
       const hitEvent = fireOnHit(engine, x, y, target, baseLaserDmg, false, mod);
       const laserDmg = hitEvent.damage;
-      target.health -= laserDmg;
-      engine.addDamageNumber(target.x, target.y, laserDmg, combat.beamColor!);
-      engine.addTileDamage(x, y, laserDmg);
+      const laserAfterShield = applyShield(engine, target, laserDmg);
+      target.health -= laserAfterShield;
+      engine.addDamageNumber(target.x, target.y, laserAfterShield, combat.beamColor!);
+      engine.addTileDamage(x, y, laserAfterShield);
       if (target.health <= 0) {
         engine.enemies = engine.enemies.filter(e => e.id !== target.id);
         killEnemy(engine, target, x, y);
@@ -434,14 +450,7 @@ function applyHitEffects(engine: GameEngine, target: Enemy, p: { damage: number;
     isCrit = !!(hitEvent as any)._isCrit;
   }
   // Enemy shield absorbs damage first
-  if (target.enemyShield && target.enemyShield > 0) {
-    const absorbed = Math.min(finalDmg, target.enemyShield);
-    target.enemyShield -= absorbed;
-    finalDmg -= absorbed;
-    if (absorbed > 0) {
-      engine.addDamageNumber(target.x, target.y - 0.3, absorbed, '#3498db');
-    }
-  }
+  finalDmg = applyShield(engine, target, finalDmg);
   target.health -= finalDmg;
   engine.addDamageNumber(target.x, target.y, finalDmg, isCrit ? '#f1c40f' : p.color);
   if (p.sourceX !== undefined && p.sourceY !== undefined) {
@@ -574,7 +583,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     const tile = engine.grid.tiles[ty]?.[tx];
 
     if (tile !== undefined && tile !== TileType.EMPTY && tile !== TileType.ORE_PATCH) {
-      if (timestamp - e.lastHit > 1000) {
+      if (engine.gameTime - e.lastHit >= 1) {
         const typeDef = ENEMY_TYPES[e.enemyType || 'normal'];
         let dmg = Math.floor(engine.diffConfig.enemyDamage * typeDef.damageMult);
 
@@ -613,7 +622,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
 
           // ── Wall Slow module: slow attacking enemy by 30% for 4s ──
           if (tileModule === ModuleType.WALL_SLOW) {
-            e.slowedUntil = timestamp + WALL_SLOW_DURATION_MS;
+            e.slowedUntil = engine.gameTime + 4;
             e.slowFactor = WALL_SLOW_FACTOR;
           }
 
@@ -630,7 +639,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
             }
           }
         }
-        e.lastHit = timestamp;
+        e.lastHit = engine.gameTime;
         if (engine.grid.healths[ty][tx] <= 0) {
           fireOnDestroyed(engine, tx, ty, tile, e);
           if (tile === TileType.CORE) { engine.gameOver = true; playGameOver(); }
@@ -656,6 +665,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
                     engine.grid.levels[ey][ex] = 0;
                     engine.grid.shields[ey][ex] = 0;
                     engine.grid.modules[ey][ex] = 0;
+                    if (engine.purchasedCounts[nType] > 0) engine.purchasedCounts[nType]--;
                     engine.cleanupTile(ex, ey);
                   }
                 }
@@ -705,7 +715,7 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
     }
 
     // Slow-on-hit module — slowFactor stored on enemy by onHit hook
-    const moduleSlowFactor = (e.slowedUntil && timestamp < e.slowedUntil && e.slowFactor) ? e.slowFactor : 1;
+    const moduleSlowFactor = (e.slowedUntil && engine.gameTime < e.slowedUntil && e.slowFactor) ? e.slowFactor : 1;
 
     // Gravity Cannon — pull enemies toward cannon + additional slow
     let gravitySlow = 1;

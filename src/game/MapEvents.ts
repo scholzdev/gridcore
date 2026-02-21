@@ -1,4 +1,4 @@
-import { TileType, getMaxHP, ORE_BUILDINGS } from '../config';
+import { TileType, ORE_BUILDINGS } from '../config';
 import type { GameEngine } from './Engine';
 import { fireOnDestroyed } from './HookSystem';
 
@@ -243,7 +243,7 @@ const RADIATION_LEAK: MapEvent = {
         if (type === TileType.CORE) continue; // Don't touch core
         if (type !== TileType.EMPTY && type !== TileType.ORE_PATCH) {
           const level = engine.grid.levels[ny][nx] || 1;
-          const maxHP = getMaxHP(type, level);
+          const maxHP = engine.getMaxHP(type, level);
           const dmg = Math.floor(maxHP * 0.25);
           engine.grid.healths[ny][nx] -= dmg;
           engine.addDamageNumber(nx + 0.5, ny + 0.5, dmg, '#00b894');

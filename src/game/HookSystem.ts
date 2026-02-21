@@ -3,7 +3,7 @@
 // Hooks are INTERCEPTORS — they can mutate event objects.
 // Callers read back modified values (e.g. event.incomeMult).
 
-import { BUILDING_REGISTRY, MODULE_REGISTRY, ALL_BUILDINGS, getMaxHP, getLevelMult } from '../config';
+import { BUILDING_REGISTRY, MODULE_REGISTRY, ALL_BUILDINGS, getLevelMult } from '../config';
 import type { BuildingRef, GameCtx, BuildingHooks } from '../config';
 import type { TickEvent, CombatTickEvent, ResourceGainedEvent, HitEvent, AuraTickEvent } from '../config/hooks';
 import type { Enemy } from './types';
@@ -19,7 +19,7 @@ export function buildingRef(game: GameCtx, x: number, y: number): BuildingRef {
     x, y, type, level,
     module: game.grid.modules[y][x] || 0,
     health: game.grid.healths[y][x],
-    maxHealth: getMaxHP(type, level),
+    maxHealth: game.getMaxHP(type, level),
     shield: game.grid.shields[y][x],
     active: game.activeTiles[y]?.[x] ?? false,
   };
@@ -105,7 +105,7 @@ export function fireOnPlace(game: GameCtx, x: number, y: number) {
 export function fireOnRemove(game: GameCtx, x: number, y: number, type: number, level: number, refund: Partial<ResourceCost>) {
   const bh = BUILDING_REGISTRY[type]?.hooks;
   const event = {
-    building: { x, y, type, level, module: 0, health: 0, maxHealth: getMaxHP(type, level), shield: 0, active: false },
+    building: { x, y, type, level, module: 0, health: 0, maxHealth: game.getMaxHP(type, level), shield: 0, active: false },
     game, refund,
   };
   bh?.onRemove?.(event);
@@ -125,7 +125,7 @@ export function fireOnUpgrade(game: GameCtx, x: number, y: number, previousLevel
 export function fireOnDestroyed(game: GameCtx, x: number, y: number, type: number, enemy?: Enemy) {
   const level = game.grid.levels[y][x] || 1;
   const event = {
-    building: { x, y, type, level, module: game.grid.modules[y][x] || 0, health: 0, maxHealth: getMaxHP(type, level), shield: 0, active: false },
+    building: { x, y, type, level, module: game.grid.modules[y][x] || 0, health: 0, maxHealth: game.getMaxHP(type, level), shield: 0, active: false },
     game, enemy,
   };
   for (const hooks of _getHookChain(game, type, x, y)) {

@@ -15,7 +15,7 @@ export const SLOW_HIT_CONFIG: ModuleConfig = {
   hooks: {
     onHit(event) {
       const m = event.game.researchBuffs.moduleEffectMult;
-      event.enemy.slowedUntil = performance.now() + 3000;
+      event.enemy.slowedUntil = event.game.gameTime + 3;
       event.enemy.slowFactor = Math.max(0.1, 1 - 0.3 * m);
     },
   },

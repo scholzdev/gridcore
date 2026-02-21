@@ -24,7 +24,7 @@ import type { MarketState } from './Market';
 import { createResearchState, computeResearchBuffs, getResearchLevel, getResearchCost, canResearch, RESEARCH_NODES } from './Research';
 import type { ResearchState, ResearchBuffs } from './Research';
 import type { Difficulty, GameMode, DifficultyConfig, Enemy, Projectile, Particle, Drone, LaserBeam, LaserFocus, DamageNumber, TileStats } from './types';
-import { createMapEventState, tickMapEvents, updateEventNotifications } from './MapEvents';
+import { createMapEventState, tickMapEvents, updateEventNotifications, ALL_EVENTS } from './MapEvents';
 import { playWaveStart } from './Sound';
 import type { MapEventState } from './MapEvents';
 import { createAbilityState, tickAbilities, activateAbility } from './Abilities';
@@ -174,11 +174,8 @@ export class GameEngine {
   placeCore(x: number, y: number): boolean {
     if (!this.placingCore) return false;
     if (!this.grid.placeCore(x, y)) return false;
-    // Apply prestige HP bonus to core
-    const hpMult = this.prestigeHpMult;
-    if (hpMult > 1) {
-      this.grid.healths[y][x] = Math.round(this.grid.healths[y][x] * hpMult);
-    }
+    // Set core HP with full multipliers (research + prestige)
+    this.grid.healths[y][x] = Math.round(this.getMaxHP(TileType.CORE, 1));
     this.placingCore = false;
     fireOnGameStart(this);
     return true;
@@ -363,6 +360,7 @@ export class GameEngine {
       globalStats: this.globalStats,
       market: this.market,
       research: this.research,
+      spawnCounter: this.spawnCounter,
       seed: this.seed,
       mapEvents: this.mapEvents,
       abilities: this.abilities,
@@ -439,10 +437,20 @@ export class GameEngine {
       }
 
       // Map Events, Abilities, misc state
-      if (s.mapEvents) this.mapEvents = s.mapEvents;
+      if (s.mapEvents) {
+        // Reconstruct active events with their function references (JSON strips functions)
+        this.mapEvents = {
+          ...s.mapEvents,
+          activeEvents: (s.mapEvents.activeEvents || []).map((ae: any) => {
+            const evt = ALL_EVENTS.find(e => e.id === ae.event?.id);
+            return evt ? { event: evt, remainingTicks: ae.remainingTicks } : null;
+          }).filter(Boolean),
+        };
+      }
       if (s.abilities) this.abilities = s.abilities;
       if (s.solarStormMult != null) this.solarStormMult = s.solarStormMult;
       if (s.nextSpawnTime != null) this.nextSpawnTime = s.nextSpawnTime;
+      if (s.spawnCounter != null) this.spawnCounter = s.spawnCounter;
       if (s.seed) {
         this.seed = s.seed;
         this.spawnRng = mulberry32(seedToNumber(this.seed) + SPAWN_RNG_OFFSET);
@@ -695,7 +703,7 @@ export class GameEngine {
 
           // Apply heal from onTick hooks (e.g. Regen module)
           if (tickEvent.healAmount > 0) {
-            const maxHP = getMaxHP(type, level) * this.researchBuffs.hpMult;
+            const maxHP = this.getMaxHP(type, level);
             this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + tickEvent.healAmount);
           }
 
@@ -706,6 +714,9 @@ export class GameEngine {
             this.grid.levels[y][x] = 0;
             this.grid.shields[y][x] = 0;
             this.grid.modules[y][x] = 0;
+            if (this.purchasedCounts[type] > 0) this.purchasedCounts[type]--;
+            this.cleanupTile(x, y);
+            this.grid.invalidatePaths();
             continue;
           }
 
@@ -843,7 +854,7 @@ export class GameEngine {
           const type = this.grid.tiles[y][x];
           if (type === TileType.EMPTY || type === TileType.ORE_PATCH) continue;
           const level = this.grid.levels[y][x] || 1;
-          const maxHP = getMaxHP(type, level) * this.researchBuffs.hpMult;
+          const maxHP = this.getMaxHP(type, level);
           const heal = maxHP * EMERGENCY_REPAIR_HEAL_FRACTION;
           this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + heal);
           this.addDamageNumber(x + 0.5, y + 0.3, Math.round(heal), '#27ae60');
@@ -852,10 +863,9 @@ export class GameEngine {
     }
 
     if (abilityId === 'emp_blast') {
-      const stunDuration = EMP_STUN_DURATION_MS;
-      const now = performance.now();
+      const stunTicks = Math.ceil(EMP_STUN_DURATION_MS / TICK_RATE_MS);
       for (const enemy of this.enemies) {
-        enemy.slowedUntil = now + stunDuration;
+        enemy.slowedUntil = this.gameTime + stunTicks;
         enemy.slowFactor = 0; // full stop
       }
     }
@@ -962,7 +972,7 @@ export class GameEngine {
 
   // ── GameCtx interface helpers ──────────────────────────────
   addParticle(p: Particle) { this.particles.push(p); }
-  getMaxHP(type: number, level: number): number { return getMaxHP(type, level) * this.researchBuffs.hpMult; }
+  getMaxHP(type: number, level: number): number { return getMaxHP(type, level) * this.researchBuffs.hpMult * this.prestigeHpMult; }
 
   addEventNotification(text: string, color: string) {
     this.mapEvents.notifications.push({ text, color, life: EVENT_NOTIFICATION_LIFETIME });

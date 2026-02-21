@@ -168,7 +168,7 @@ export class Renderer {
 
           // HP bar — only when damaged
           const hp = grid.healths[y][x];
-          const max = getMaxHP(type, level);
+          const max = engine.getMaxHP(type, level);
           if (hp < max) {
             ctx.fillStyle = '#ecf0f1'; ctx.fillRect(px + p, py + zoom - p - 5, s, 5);
             ctx.fillStyle = hp / max > 0.5 ? '#2ecc71' : hp / max > 0.25 ? '#f39c12' : '#e74c3c';

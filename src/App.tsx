@@ -482,10 +482,8 @@ function App() {
           engineRef.current.resources.spend(upgradeCost);
           const newLevel = engineRef.current.grid.levels[worldY][worldX];
           engineRef.current.fireUpgradeHook(worldX, worldY, currentLevel, newLevel);
-          const hpMult = engineRef.current.prestigeHpMult;
-          if (hpMult > 1) {
-            engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
-          }
+          // Set HP to full max including research + prestige multipliers
+          engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.getMaxHP(currentTile, newLevel));
           playUpgrade();
           setResources({ ...engineRef.current.resources.state });
           refreshTooltip(worldX, worldY);
@@ -498,10 +496,8 @@ function App() {
         if (engineRef.current.grid.placeBuilding(worldX, worldY, selectedBuilding)) {
           engineRef.current.resources.spend(cost);
           engineRef.current.firePlaceHook(worldX, worldY);
-          const hpMult = engineRef.current.prestigeHpMult;
-          if (hpMult > 1) {
-            engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.grid.healths[worldY][worldX] * hpMult);
-          }
+          // Set HP to full max including research + prestige multipliers
+          engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.getMaxHP(selectedBuilding, 1));
           engineRef.current.purchasedCounts[selectedBuilding] = (engineRef.current.purchasedCounts[selectedBuilding] || 0) + 1;
           engineRef.current.buildingsPlaced++;
           playBuild();
@@ -617,6 +613,9 @@ function App() {
       const oldLevel = engineRef.current.grid.downgradeBuilding(worldX, worldY);
       if (oldLevel > 0) {
         engineRef.current.resources.add(refund);
+        // Set HP to full max for the new (lower) level including research + prestige
+        const newLvl = engineRef.current.grid.levels[worldY][worldX];
+        engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.getMaxHP(type, newLvl));
         playSell();
         setResources({ ...engineRef.current.resources.state });
         refreshTooltip(worldX, worldY);

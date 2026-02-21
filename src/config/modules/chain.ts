@@ -40,10 +40,22 @@ export const CHAIN_CONFIG: ModuleConfig = {
           count++;
         }
       }
-      // Remove chain-killed enemies
+      // Remove chain-killed enemies and award kills
       if (killed.length > 0) {
         const killedIds = new Set(killed.map(e => e.id));
         event.game.enemies = event.game.enemies.filter(e => !killedIds.has(e.id));
+        for (const e of killed) {
+          e.dead = true;
+          event.game.enemiesKilled++;
+          event.game.killPoints++;
+          if (event.game.gameMode === 'wellen') (event.game as any).onWaveEnemyKilled();
+          if (event.building) {
+            event.game.addTileKill(event.building.x, event.building.y);
+          }
+          // Kill reward
+          const rewardBase = 15 + event.game.gameTime * 0.1;
+          event.game.resources.add({ scrap: Math.floor(rewardBase) });
+        }
       }
     },
   },
