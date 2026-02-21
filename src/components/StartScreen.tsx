@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { DIFFICULTY_PRESETS } from '../game/types';
 import type { Difficulty, GameMode } from '../game/types';
 import { hasTutorialBeenCompleted } from '../game/Tutorial';
+import { isValidReplay } from '../game/Replay';
+import type { ReplayData } from '../game/Replay';
 
 interface StartScreenProps {
   gameMode: GameMode;
@@ -11,11 +13,28 @@ interface StartScreenProps {
   seed: string;
   setSeed: (s: string) => void;
   onStartTutorial: () => void;
+  onLoadReplay: (replay: ReplayData) => void;
 }
 
-export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStarted, seed, setSeed, onStartTutorial }: StartScreenProps) => {
+export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStarted, seed, setSeed, onStartTutorial, onLoadReplay }: StartScreenProps) => {
   const [showSeed, setShowSeed] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
+  const [replayError, setReplayError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const tutorialDone = hasTutorialBeenCompleted();
+
+  const handleReplayFile = (file: File) => {
+    setReplayError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string);
+        if (!isValidReplay(data)) { setReplayError('Ungültiges Replay-Format'); return; }
+        onLoadReplay(data);
+      } catch { setReplayError('JSON konnte nicht gelesen werden'); }
+    };
+    reader.readAsText(file);
+  };
 
   return (
   <div style={{
@@ -120,6 +139,48 @@ export const StartScreen = ({ gameMode, setGameMode, setDifficulty, setGameStart
           <div style={{ fontSize: '10px', color: '#b2bec3', marginTop: '4px' }}>
             Gleicher Seed = gleiche Karte (Erzverteilung)
           </div>
+        </div>
+      )}
+    </div>
+
+    {/* Replay Loader */}
+    <div style={{ textAlign: 'center' }}>
+      <button
+        onClick={() => setShowReplay(!showReplay)}
+        style={{
+          background: 'none', border: 'none', fontSize: '12px', color: '#b2bec3',
+          cursor: 'pointer', fontFamily: 'monospace', textDecoration: 'underline'
+        }}
+      >
+        🎬 Replay laden
+      </button>
+      {showReplay && (
+        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={e => { if (e.target.files?.[0]) handleReplayFile(e.target.files[0]); }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              padding: '10px 24px', cursor: 'pointer', borderRadius: '8px', fontSize: '14px',
+              fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#6c5ce7',
+              color: '#fff', border: 'none', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#5f3dc4'; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#6c5ce7'; }}
+          >
+            📂 Replay-Datei öffnen (.json)
+          </button>
+          <div style={{ fontSize: '10px', color: '#b2bec3' }}>
+            Replay-Dateien werden von der AI-Simulation erzeugt
+          </div>
+          {replayError && (
+            <div style={{ fontSize: '12px', color: '#e74c3c', fontWeight: 'bold' }}>{replayError}</div>
+          )}
         </div>
       )}
     </div>

@@ -33,6 +33,8 @@ interface TopBarProps {
   waveInfo: WaveInfo;
   gameSpeed: number;
   nextWavePreview: WaveComposition[] | null;
+  isReplay?: boolean;
+  replayId?: string;
   onTogglePause: () => void;
   onRestart: () => void;
   onToggleTechTree: () => void;
@@ -156,6 +158,7 @@ function menuBtn(bg: string): React.CSSProperties {
 export const TopBar = ({
   paused, isGameOver, difficulty, gameMode, gameStats, coreHealth, resources, netIncome,
   resourceBreakdown, killPoints, showTechTree, waveInfo, gameSpeed, nextWavePreview,
+  isReplay, replayId,
   onTogglePause, onRestart, onToggleTechTree, onTogglePrestige, onToggleStats, onToggleMarket,
   onToggleResearch, onToggleGuide, onToggleLeaderboard, onToggleMute, onToggleSpeed,
   isMuted, onSave, onLoad, hasSave, seed, onHighlightResource,
@@ -179,6 +182,15 @@ export const TopBar = ({
       }}>
         {/* Controls group */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {isReplay && (
+          <span style={{
+            padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+            fontFamily: 'monospace', backgroundColor: '#6c5ce7', color: '#fff',
+            letterSpacing: '1px',
+          }} title={replayId ? `Replay: ${replayId}` : undefined}>
+            🎬 REPLAY
+          </span>
+        )}
         <button onClick={onTogglePause} style={{
           padding: '4px 10px', cursor: 'pointer', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace',
           backgroundColor: paused ? '#e74c3c' : '#27ae60', color: '#fff', border: 'none'

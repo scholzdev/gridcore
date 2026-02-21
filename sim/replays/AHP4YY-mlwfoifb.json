@@ -1,0 +1,1335 @@
+{
+  "id": "AHP4YY-mlwfoifb",
+  "seed": "AHP4YY",
+  "mode": "wellen",
+  "difficulty": "mittel",
+  "coreX": 15,
+  "coreY": 15,
+  "actions": [
+    {
+      "tick": 0,
+      "action": "place",
+      "x": 15,
+      "y": 14,
+      "type": 3
+    },
+    {
+      "tick": 2,
+      "action": "place",
+      "x": 14,
+      "y": 15,
+      "type": 3
+    },
+    {
+      "tick": 4,
+      "action": "place",
+      "x": 16,
+      "y": 15,
+      "type": 3
+    },
+    {
+      "tick": 6,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 8,
+      "action": "place",
+      "x": 19,
+      "y": 12,
+      "type": 4
+    },
+    {
+      "tick": 10,
+      "action": "place",
+      "x": 9,
+      "y": 14,
+      "type": 4
+    },
+    {
+      "tick": 12,
+      "action": "place",
+      "x": 15,
+      "y": 11,
+      "type": 5
+    },
+    {
+      "tick": 14,
+      "action": "place",
+      "x": 14,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 16,
+      "action": "place",
+      "x": 16,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 18,
+      "action": "place",
+      "x": 15,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 20,
+      "action": "place",
+      "x": 15,
+      "y": 13,
+      "type": 1
+    },
+    {
+      "tick": 22,
+      "action": "place",
+      "x": 14,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 24,
+      "action": "place",
+      "x": 16,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 26,
+      "action": "place",
+      "x": 13,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 28,
+      "action": "place",
+      "x": 17,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 30,
+      "action": "place",
+      "x": 14,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 32,
+      "action": "unlock",
+      "techId": "mine"
+    },
+    {
+      "tick": 32,
+      "action": "place",
+      "x": 16,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 34,
+      "action": "place",
+      "x": 11,
+      "y": 18,
+      "type": 4
+    },
+    {
+      "tick": 36,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 38,
+      "action": "upgrade",
+      "x": 15,
+      "y": 11,
+      "type": 5
+    },
+    {
+      "tick": 40,
+      "action": "upgrade",
+      "x": 14,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 42,
+      "action": "upgrade",
+      "x": 16,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 44,
+      "action": "upgrade",
+      "x": 15,
+      "y": 11,
+      "type": 5
+    },
+    {
+      "tick": 46,
+      "action": "upgrade",
+      "x": 14,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 48,
+      "action": "upgrade",
+      "x": 16,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 60,
+      "action": "upgrade",
+      "x": 15,
+      "y": 11,
+      "type": 5
+    },
+    {
+      "tick": 62,
+      "action": "unlock",
+      "techId": "emp"
+    },
+    {
+      "tick": 62,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 64,
+      "action": "place",
+      "x": 16,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 66,
+      "action": "unlock",
+      "techId": "repair"
+    },
+    {
+      "tick": 66,
+      "action": "place",
+      "x": 11,
+      "y": 18,
+      "type": 4
+    },
+    {
+      "tick": 74,
+      "action": "upgrade",
+      "x": 14,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 88,
+      "action": "upgrade",
+      "x": 16,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 90,
+      "action": "unlock",
+      "techId": "foundry"
+    },
+    {
+      "tick": 96,
+      "action": "place",
+      "x": 16,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 98,
+      "action": "place",
+      "x": 11,
+      "y": 18,
+      "type": 4
+    },
+    {
+      "tick": 100,
+      "action": "unlock",
+      "techId": "smelter"
+    },
+    {
+      "tick": 114,
+      "action": "place",
+      "x": 8,
+      "y": 14,
+      "type": 23
+    },
+    {
+      "tick": 116,
+      "action": "place",
+      "x": 11,
+      "y": 19,
+      "type": 23
+    },
+    {
+      "tick": 118,
+      "action": "place",
+      "x": 20,
+      "y": 19,
+      "type": 23
+    },
+    {
+      "tick": 120,
+      "action": "place",
+      "x": 13,
+      "y": 13,
+      "type": 5
+    },
+    {
+      "tick": 120,
+      "action": "module",
+      "x": 15,
+      "y": 13,
+      "moduleType": 12
+    },
+    {
+      "tick": 122,
+      "action": "place",
+      "x": 15,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 122,
+      "action": "module",
+      "x": 14,
+      "y": 14,
+      "moduleType": 12
+    },
+    {
+      "tick": 124,
+      "action": "place",
+      "x": 15,
+      "y": 12,
+      "type": 1
+    },
+    {
+      "tick": 124,
+      "action": "module",
+      "x": 15,
+      "y": 12,
+      "moduleType": 12
+    },
+    {
+      "tick": 126,
+      "action": "place",
+      "x": 14,
+      "y": 13,
+      "type": 1
+    },
+    {
+      "tick": 126,
+      "action": "module",
+      "x": 14,
+      "y": 13,
+      "moduleType": 12
+    },
+    {
+      "tick": 128,
+      "action": "place",
+      "x": 11,
+      "y": 19,
+      "type": 23
+    },
+    {
+      "tick": 130,
+      "action": "place",
+      "x": 14,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 130,
+      "action": "module",
+      "x": 16,
+      "y": 14,
+      "moduleType": 12
+    },
+    {
+      "tick": 132,
+      "action": "place",
+      "x": 16,
+      "y": 13,
+      "type": 1
+    },
+    {
+      "tick": 132,
+      "action": "module",
+      "x": 16,
+      "y": 13,
+      "moduleType": 12
+    },
+    {
+      "tick": 134,
+      "action": "place",
+      "x": 13,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 134,
+      "action": "module",
+      "x": 13,
+      "y": 14,
+      "moduleType": 12
+    },
+    {
+      "tick": 136,
+      "action": "place",
+      "x": 17,
+      "y": 14,
+      "type": 11
+    },
+    {
+      "tick": 136,
+      "action": "module",
+      "x": 13,
+      "y": 15,
+      "moduleType": 12
+    },
+    {
+      "tick": 138,
+      "action": "place",
+      "x": 12,
+      "y": 15,
+      "type": 11
+    },
+    {
+      "tick": 140,
+      "action": "place",
+      "x": 18,
+      "y": 15,
+      "type": 12
+    },
+    {
+      "tick": 140,
+      "action": "module",
+      "x": 17,
+      "y": 15,
+      "moduleType": 12
+    },
+    {
+      "tick": 142,
+      "action": "place",
+      "x": 13,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 142,
+      "action": "module",
+      "x": 14,
+      "y": 16,
+      "moduleType": 12
+    },
+    {
+      "tick": 144,
+      "action": "place",
+      "x": 17,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 144,
+      "action": "module",
+      "x": 15,
+      "y": 16,
+      "moduleType": 12
+    },
+    {
+      "tick": 146,
+      "action": "place",
+      "x": 14,
+      "y": 17,
+      "type": 12
+    },
+    {
+      "tick": 146,
+      "action": "module",
+      "x": 15,
+      "y": 17,
+      "moduleType": 12
+    },
+    {
+      "tick": 148,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 150,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 152,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 3
+    },
+    {
+      "tick": 154,
+      "action": "place",
+      "x": 9,
+      "y": 11,
+      "type": 4
+    },
+    {
+      "tick": 156,
+      "action": "upgrade",
+      "x": 13,
+      "y": 13,
+      "type": 5
+    },
+    {
+      "tick": 158,
+      "action": "upgrade",
+      "x": 13,
+      "y": 13,
+      "type": 5
+    },
+    {
+      "tick": 160,
+      "action": "upgrade",
+      "x": 13,
+      "y": 13,
+      "type": 5
+    },
+    {
+      "tick": 162,
+      "action": "unlock",
+      "techId": "storm"
+    },
+    {
+      "tick": 162,
+      "action": "place",
+      "x": 11,
+      "y": 18,
+      "type": 23
+    },
+    {
+      "tick": 164,
+      "action": "place",
+      "x": 11,
+      "y": 19,
+      "type": 23
+    },
+    {
+      "tick": 166,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 168,
+      "action": "place",
+      "x": 20,
+      "y": 19,
+      "type": 4
+    },
+    {
+      "tick": 172,
+      "action": "upgrade",
+      "x": 15,
+      "y": 11,
+      "type": 5
+    },
+    {
+      "tick": 194,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 3
+    },
+    {
+      "tick": 196,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 200,
+      "action": "place",
+      "x": 11,
+      "y": 18,
+      "type": 23
+    },
+    {
+      "tick": 202,
+      "action": "place",
+      "x": 18,
+      "y": 15,
+      "type": 12
+    },
+    {
+      "tick": 204,
+      "action": "unlock",
+      "techId": "tesla"
+    },
+    {
+      "tick": 204,
+      "action": "upgrade",
+      "x": 14,
+      "y": 12,
+      "type": 5
+    },
+    {
+      "tick": 228,
+      "action": "place",
+      "x": 9,
+      "y": 11,
+      "type": 4
+    },
+    {
+      "tick": 230,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 232,
+      "action": "place",
+      "x": 18,
+      "y": 15,
+      "type": 12
+    },
+    {
+      "tick": 234,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 236,
+      "action": "place",
+      "x": 16,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 238,
+      "action": "place",
+      "x": 17,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 240,
+      "action": "place",
+      "x": 9,
+      "y": 11,
+      "type": 4
+    },
+    {
+      "tick": 248,
+      "action": "unlock",
+      "techId": "shield"
+    },
+    {
+      "tick": 248,
+      "action": "place",
+      "x": 17,
+      "y": 13,
+      "type": 14
+    },
+    {
+      "tick": 262,
+      "action": "place",
+      "x": 19,
+      "y": 17,
+      "type": 4
+    },
+    {
+      "tick": 264,
+      "action": "unlock",
+      "techId": "efab"
+    },
+    {
+      "tick": 264,
+      "action": "place",
+      "x": 11,
+      "y": 18,
+      "type": 23
+    },
+    {
+      "tick": 266,
+      "action": "place",
+      "x": 8,
+      "y": 14,
+      "type": 23
+    },
+    {
+      "tick": 268,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 270,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 3
+    },
+    {
+      "tick": 272,
+      "action": "place",
+      "x": 15,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 272,
+      "action": "module",
+      "x": 15,
+      "y": 17,
+      "moduleType": 12
+    },
+    {
+      "tick": 274,
+      "action": "place",
+      "x": 12,
+      "y": 14,
+      "type": 8
+    },
+    {
+      "tick": 276,
+      "action": "place",
+      "x": 18,
+      "y": 14,
+      "type": 8
+    },
+    {
+      "tick": 278,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 278,
+      "action": "module",
+      "x": 15,
+      "y": 11,
+      "moduleType": 1
+    },
+    {
+      "tick": 280,
+      "action": "place",
+      "x": 9,
+      "y": 14,
+      "type": 4
+    },
+    {
+      "tick": 280,
+      "action": "module",
+      "x": 14,
+      "y": 12,
+      "moduleType": 1
+    },
+    {
+      "tick": 282,
+      "action": "place",
+      "x": 20,
+      "y": 19,
+      "type": 4
+    },
+    {
+      "tick": 282,
+      "action": "module",
+      "x": 17,
+      "y": 13,
+      "moduleType": 8
+    },
+    {
+      "tick": 286,
+      "action": "module",
+      "x": 16,
+      "y": 12,
+      "moduleType": 3
+    },
+    {
+      "tick": 290,
+      "action": "module",
+      "x": 13,
+      "y": 13,
+      "moduleType": 3
+    },
+    {
+      "tick": 298,
+      "action": "place",
+      "x": 11,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 298,
+      "action": "module",
+      "x": 11,
+      "y": 15,
+      "moduleType": 12
+    },
+    {
+      "tick": 300,
+      "action": "place",
+      "x": 19,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 300,
+      "action": "module",
+      "x": 19,
+      "y": 15,
+      "moduleType": 12
+    },
+    {
+      "tick": 302,
+      "action": "place",
+      "x": 12,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 302,
+      "action": "module",
+      "x": 12,
+      "y": 16,
+      "moduleType": 12
+    },
+    {
+      "tick": 304,
+      "action": "place",
+      "x": 18,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 304,
+      "action": "module",
+      "x": 18,
+      "y": 16,
+      "moduleType": 12
+    },
+    {
+      "tick": 306,
+      "action": "place",
+      "x": 13,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 306,
+      "action": "module",
+      "x": 13,
+      "y": 17,
+      "moduleType": 12
+    },
+    {
+      "tick": 308,
+      "action": "place",
+      "x": 17,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 308,
+      "action": "module",
+      "x": 17,
+      "y": 17,
+      "moduleType": 12
+    },
+    {
+      "tick": 310,
+      "action": "unlock",
+      "techId": "crystal"
+    },
+    {
+      "tick": 310,
+      "action": "place",
+      "x": 14,
+      "y": 18,
+      "type": 10
+    },
+    {
+      "tick": 312,
+      "action": "place",
+      "x": 16,
+      "y": 18,
+      "type": 1
+    },
+    {
+      "tick": 312,
+      "action": "module",
+      "x": 14,
+      "y": 18,
+      "moduleType": 3
+    },
+    {
+      "tick": 314,
+      "action": "place",
+      "x": 15,
+      "y": 19,
+      "type": 1
+    },
+    {
+      "tick": 314,
+      "action": "module",
+      "x": 16,
+      "y": 18,
+      "moduleType": 12
+    },
+    {
+      "tick": 316,
+      "action": "module",
+      "x": 15,
+      "y": 19,
+      "moduleType": 12
+    },
+    {
+      "tick": 334,
+      "action": "place",
+      "x": 15,
+      "y": 10,
+      "type": 10
+    },
+    {
+      "tick": 336,
+      "action": "module",
+      "x": 15,
+      "y": 10,
+      "moduleType": 1
+    },
+    {
+      "tick": 348,
+      "action": "place",
+      "x": 16,
+      "y": 18,
+      "type": 1
+    },
+    {
+      "tick": 348,
+      "action": "module",
+      "x": 16,
+      "y": 18,
+      "moduleType": 12
+    },
+    {
+      "tick": 350,
+      "action": "place",
+      "x": 15,
+      "y": 19,
+      "type": 1
+    },
+    {
+      "tick": 350,
+      "action": "module",
+      "x": 15,
+      "y": 19,
+      "moduleType": 12
+    },
+    {
+      "tick": 362,
+      "action": "place",
+      "x": 14,
+      "y": 11,
+      "type": 10
+    },
+    {
+      "tick": 364,
+      "action": "module",
+      "x": 14,
+      "y": 11,
+      "moduleType": 1
+    },
+    {
+      "tick": 378,
+      "action": "unlock",
+      "techId": "laser"
+    },
+    {
+      "tick": 378,
+      "action": "place",
+      "x": 16,
+      "y": 11,
+      "type": 19
+    },
+    {
+      "tick": 380,
+      "action": "module",
+      "x": 16,
+      "y": 11,
+      "moduleType": 3
+    },
+    {
+      "tick": 402,
+      "action": "place",
+      "x": 13,
+      "y": 12,
+      "type": 19
+    },
+    {
+      "tick": 408,
+      "action": "module",
+      "x": 13,
+      "y": 12,
+      "moduleType": 1
+    },
+    {
+      "tick": 416,
+      "action": "place",
+      "x": 16,
+      "y": 18,
+      "type": 1
+    },
+    {
+      "tick": 416,
+      "action": "module",
+      "x": 16,
+      "y": 18,
+      "moduleType": 12
+    },
+    {
+      "tick": 418,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 3
+    },
+    {
+      "tick": 420,
+      "action": "place",
+      "x": 13,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 420,
+      "action": "module",
+      "x": 13,
+      "y": 17,
+      "moduleType": 12
+    },
+    {
+      "tick": 426,
+      "action": "unlock",
+      "techId": "radar"
+    },
+    {
+      "tick": 426,
+      "action": "place",
+      "x": 15,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 494,
+      "action": "place",
+      "x": 13,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 496,
+      "action": "place",
+      "x": 14,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 498,
+      "action": "place",
+      "x": 14,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 500,
+      "action": "unlock",
+      "techId": "recycler"
+    },
+    {
+      "tick": 500,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 536,
+      "action": "place",
+      "x": 13,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 538,
+      "action": "place",
+      "x": 14,
+      "y": 17,
+      "type": 3
+    },
+    {
+      "tick": 540,
+      "action": "place",
+      "x": 12,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 542,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 3
+    },
+    {
+      "tick": 544,
+      "action": "place",
+      "x": 15,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 550,
+      "action": "place",
+      "x": 13,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 564,
+      "action": "unlock",
+      "techId": "lab"
+    },
+    {
+      "tick": 612,
+      "action": "place",
+      "x": 12,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 614,
+      "action": "place",
+      "x": 13,
+      "y": 16,
+      "type": 3
+    },
+    {
+      "tick": 616,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 3
+    },
+    {
+      "tick": 622,
+      "action": "place",
+      "x": 13,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 624,
+      "action": "place",
+      "x": 12,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 626,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 634,
+      "action": "place",
+      "x": 14,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 636,
+      "action": "place",
+      "x": 13,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 654,
+      "action": "place",
+      "x": 12,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 684,
+      "action": "unlock",
+      "techId": "fusion"
+    },
+    {
+      "tick": 700,
+      "action": "unlock",
+      "techId": "plasma"
+    },
+    {
+      "tick": 718,
+      "action": "place",
+      "x": 15,
+      "y": 18,
+      "type": 1
+    },
+    {
+      "tick": 720,
+      "action": "place",
+      "x": 13,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 722,
+      "action": "place",
+      "x": 16,
+      "y": 17,
+      "type": 1
+    },
+    {
+      "tick": 724,
+      "action": "place",
+      "x": 12,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 730,
+      "action": "place",
+      "x": 13,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 732,
+      "action": "place",
+      "x": 14,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 740,
+      "action": "place",
+      "x": 13,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 742,
+      "action": "place",
+      "x": 13,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 832,
+      "action": "place",
+      "x": 12,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 842,
+      "action": "place",
+      "x": 12,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 850,
+      "action": "place",
+      "x": 13,
+      "y": 15,
+      "type": 1
+    },
+    {
+      "tick": 852,
+      "action": "place",
+      "x": 14,
+      "y": 16,
+      "type": 1
+    },
+    {
+      "tick": 854,
+      "action": "place",
+      "x": 14,
+      "y": 13,
+      "type": 1
+    },
+    {
+      "tick": 856,
+      "action": "place",
+      "x": 13,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 858,
+      "action": "place",
+      "x": 14,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 860,
+      "action": "place",
+      "x": 16,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 862,
+      "action": "place",
+      "x": 15,
+      "y": 14,
+      "type": 1
+    },
+    {
+      "tick": 864,
+      "action": "place",
+      "x": 14,
+      "y": 15,
+      "type": 1
+    }
+  ],
+  "result": {
+    "wavesReached": 18,
+    "enemiesKilled": 252,
+    "gameTime": 866,
+    "gameOver": true
+  }
+}

@@ -9,10 +9,11 @@ export const HEAVY_TURRET_CONFIG: BuildingConfig = {
   category: 'defense',
 
   health: 3000,
-  range: 12,
-  damage: 150,
-  cost: { steel: 300, electronics: 200 },
-  costIncrease: { steel: 200, electronics: 100 },
+  range: 10,
+  damage: 125,
+  cost: { steel: 400, electronics: 300 },
+  costIncrease: { steel: 200, electronics: 150 },
+  consumes: { energy: 7.5 },
 
   combat: {
     fireChance: 0.9,

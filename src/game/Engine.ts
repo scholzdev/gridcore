@@ -31,7 +31,9 @@ import { createAbilityState, tickAbilities, activateAbility } from './Abilities'
 import type { AbilityState } from './Abilities';
 import { DIFFICULTY_PRESETS, WAVE_CONFIG, ENEMY_TYPES, getWaveComposition, pickEnemyType, getEndlessEnemyType } from './types';
 import type { TechNode } from './TechTree';
+import { TECH_TREE, ModuleType, MODULE_DEFS } from '../config';
 import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed, fireOnPlace, fireOnUpgrade, fireOnRemove, fireOnKill } from './HookSystem';
+import type { ReplayData } from './Replay';
 
 export class GameEngine {
   grid: GameGrid;
@@ -141,6 +143,13 @@ export class GameEngine {
   spawnRng: () => number = Math.random;
   private spawnCounter: number = 0;
 
+  // ── Replay Mode ──────────────────────────────────────────────
+  replayData: ReplayData | null = null;
+  /** Index into replayData.actions — next action to apply */
+  private replayActionIndex: number = 0;
+  /** True when engine is in replay playback mode (disables user interaction) */
+  get isReplay(): boolean { return this.replayData !== null; }
+
   constructor(canvas: HTMLCanvasElement, seed?: string) {
     this.canvas = canvas;
     this.grid = new GameGrid(GRID_SIZE, seed);
@@ -179,6 +188,175 @@ export class GameEngine {
     this.placingCore = false;
     fireOnGameStart(this);
     return true;
+  }
+
+  // ── Replay Playback ─────────────────────────────────────────
+
+  /** Initialise replay mode: set seed/mode/difficulty, place core, prepare action list. */
+  initReplay(replay: ReplayData) {
+    this.replayData = replay;
+    this.replayActionIndex = 0;
+    // Core is placed by the caller (App.tsx already uses placeCore)
+  }
+
+  /**
+   * Create a new engine from a replay and fast-forward to targetTick without rendering.
+   * Returns the new engine ready for continued rAF playback.
+   */
+  static seekReplay(canvas: HTMLCanvasElement, replay: ReplayData, targetTick: number): GameEngine {
+    const engine = new GameEngine(canvas, replay.seed);
+    engine.setDifficulty(replay.difficulty as Difficulty);
+    engine.setGameMode(replay.mode as GameMode);
+    engine.placeCore(replay.coreX, replay.coreY);
+    engine.initReplay(replay);
+    engine.gameSpeed = 1; // will be overridden by caller
+
+    if (engine.gameMode === 'wellen') {
+      engine.waveBuildPhase = true;
+    }
+
+    // Fast-forward tick by tick (headless — no rendering)
+    let fakeTs = 1000;
+    for (let t = 0; t < targetTick && !engine.gameOver; t++) {
+      engine.gameTime++;
+      engine.tick();
+      engine.applyReplayActions();
+
+      // Wave build phase
+      if (engine.gameMode === 'wellen' && engine.waveBuildPhase) {
+        engine.waveBuildTimer--;
+        if (engine.waveBuildTimer <= 0) engine.startNextWave();
+      }
+
+      tickMapEvents(engine);
+
+      // Spawning
+      fakeTs += 1000;
+      if (engine.gameMode === 'endlos') {
+        if (engine.gameTime >= 15) engine.spawnEnemy();
+      } else if (engine.gameMode === 'wellen' && engine.waveActive && engine.waveEnemiesSpawned < engine.waveEnemiesTotal) {
+        const toSpawn = Math.min(2, engine.waveEnemiesTotal - engine.waveEnemiesSpawned);
+        for (let s = 0; s < toSpawn; s++) {
+          engine.spawnWaveEnemy();
+          engine.waveEnemiesSpawned++;
+        }
+      }
+
+      // Combat (60 frames / tick like the headless sim)
+      for (let frame = 0; frame < 60; frame++) {
+        detonateMines(engine);
+        moveEnemies(engine, fakeTs + frame * 16);
+        turretLogic(engine);
+        updateProjectiles(engine);
+        updateDrones(engine);
+      }
+
+      tickAbilities(engine.abilities);
+    }
+
+    // Reset visual-only timers so they don't flash on screen
+    engine.lastTick = 0;
+    engine.damageNumbers = [];
+    engine.muzzleFlashes = [];
+    engine.particles = [];
+    engine.waveSplashLife = 0;
+
+    return engine;
+  }
+
+  /** Apply all replay actions whose tick matches the current gameTime.
+   *  Called once per economy tick, right after gameTime is incremented. */
+  private applyReplayActions() {
+    if (!this.replayData) return;
+    const actions = this.replayData.actions;
+    while (this.replayActionIndex < actions.length) {
+      const a = actions[this.replayActionIndex];
+      if (a.tick > this.gameTime) break; // future action — wait
+      this.replayActionIndex++;
+      // Skip past actions (shouldn't happen normally)
+      if (a.tick < this.gameTime) continue;
+
+      switch (a.action) {
+        case 'place': {
+          if (a.x == null || a.y == null || a.type == null) break;
+          const type = a.type as TileType;
+          // Give resources so placement always succeeds
+          const cost = this.getCurrentCost(type);
+          if (!this.resources.canAfford(cost)) this.resources.add(cost);
+          if (this.grid.placeBuilding(a.x, a.y, type)) {
+            this.resources.spend(cost);
+            this.firePlaceHook(a.x, a.y);
+            this.grid.healths[a.y][a.x] = Math.round(this.getMaxHP(type, 1));
+            this.purchasedCounts[type] = (this.purchasedCounts[type] || 0) + 1;
+            this.buildingsPlaced++;
+          }
+          break;
+        }
+        case 'upgrade': {
+          if (a.x == null || a.y == null) break;
+          const tileType = this.grid.tiles[a.y][a.x];
+          const level = this.grid.levels[a.y][a.x];
+          const ucost = this.getUpgradeCost(tileType, level);
+          if (ucost && !this.resources.canAfford(ucost)) this.resources.add(ucost);
+          if (this.grid.upgradeBuilding(a.x, a.y)) {
+            if (ucost) this.resources.spend(ucost);
+            const newLvl = this.grid.levels[a.y][a.x];
+            this.fireUpgradeHook(a.x, a.y, level, newLvl);
+            this.grid.healths[a.y][a.x] = Math.round(this.getMaxHP(tileType, newLvl));
+          }
+          break;
+        }
+        case 'unlock': {
+          if (!a.techId) break;
+          const node = TECH_TREE.find(n => n.id === a.techId);
+          if (node) {
+            // Give kill points so unlock always succeeds
+            if (this.killPoints < node.killCost) this.killPoints = node.killCost;
+            this.unlockBuilding(node);
+          }
+          break;
+        }
+        case 'module': {
+          if (a.x == null || a.y == null || a.moduleType == null) break;
+          const mod = a.moduleType as ModuleType;
+          const modDef = MODULE_DEFS[mod];
+          if (modDef) {
+            if (!this.resources.canAfford(modDef.cost)) this.resources.add(modDef.cost);
+            if (this.grid.installModule(a.x, a.y, mod)) {
+              this.resources.spend(modDef.cost);
+            }
+          }
+          break;
+        }
+        case 'research': {
+          if (!a.researchId) break;
+          const rNode = RESEARCH_NODES.find(n => n.id === a.researchId);
+          if (rNode) {
+            // Give data so research always succeeds
+            const needed = 9999;
+            if (this.resources.state.data < needed) this.resources.state.data = needed;
+            this.buyResearch(a.researchId);
+          }
+          break;
+        }
+        case 'remove': {
+          if (a.x == null || a.y == null) break;
+          const remType = this.grid.tiles[a.y][a.x];
+          const remLevel = this.grid.levels[a.y][a.x];
+          if (remType !== TileType.EMPTY && remType !== TileType.ORE_PATCH && remType !== TileType.CORE) {
+            const refund = this.getRefund(remType, remLevel);
+            const removed = this.grid.removeBuilding(a.x, a.y);
+            if (removed > 0) {
+              this.resources.add(refund);
+              this.fireRemoveHook(a.x, a.y, remType, removed, refund);
+              if (this.purchasedCounts[remType] > 0) this.purchasedCounts[remType]--;
+              this.cleanupTile(a.x, a.y);
+            }
+          }
+          break;
+        }
+      }
+    }
   }
 
   startNextWave() {
@@ -548,7 +726,7 @@ export class GameEngine {
       return;
     }
     if (this.gameOver) {
-      if (!this.prestigeAwarded) {
+      if (!this.prestigeAwarded && !this.isReplay) {
         this.prestigeEarned = calcPrestigeEarned(this.enemiesKilled, this.gameTime);
         this.prestige.totalPoints += this.prestigeEarned;
         savePrestige(this.prestige);
@@ -570,6 +748,9 @@ export class GameEngine {
       this.tick();
       this.lastTick = timestamp;
       if (!this.tutorialPaused) this.gameTime++;
+
+      // Apply replay actions for this tick
+      if (this.replayData) this.applyReplayActions();
 
       if (this.gameMode === 'wellen' && this.waveBuildPhase && !this.tutorialPaused) {
         this.waveBuildTimer--;

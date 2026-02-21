@@ -9,7 +9,7 @@ export const WALL_CONFIG: BuildingConfig = {
   category: 'infrastructure',
   starter: true,
 
-  health: 2500,
+  health: 1250,
   cost: { scrap: 15 },
   costIncrease: { scrap: 5 },
 

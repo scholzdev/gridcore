@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameEngine } from './game/Engine';
 import type { Difficulty, GameMode, TileStats } from './game/types';
 import { TileType, BUILDING_STATS, ModuleType, MODULE_DEFS, STARTER_BUILDINGS, BUILDING_NAMES } from './config';
@@ -29,6 +29,8 @@ import type { AbilityState } from './game/Abilities';
 import { TutorialOverlay } from './components/TutorialOverlay';
 import { createTutorialState, getCurrentStep, advanceTutorial, skipTutorial, TUTORIAL_STEPS } from './game/Tutorial';
 import type { TutorialState } from './game/Tutorial';
+import type { ReplayData } from './game/Replay';
+import { ReplayControls } from './components/ReplayControls';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,6 +83,8 @@ function App() {
   const [abilityState, setAbilityState] = useState<AbilityState>(() => createAbilityState());
   const [gameSpeed, setGameSpeed] = useState(1);
   const [tutorial, setTutorial] = useState<TutorialState>(() => createTutorialState());
+  const [replayData, setReplayData] = useState<ReplayData | null>(null);
+  const [replaySeeking, setReplaySeeking] = useState(false);
 
   // ── Pan/Zoom & Drag state ──────────────────────────────────
   const isPanning = useRef(false);
@@ -151,6 +155,37 @@ function App() {
     setGameStarted(true);
   };
 
+  const handleLoadReplay = (replay: ReplayData) => {
+    setReplayData(replay);
+    setDifficulty(replay.difficulty as Difficulty);
+    setGameMode(replay.mode as GameMode);
+    setGameSeed(replay.seed);
+    setGameStarted(true);
+  };
+
+  /** Seek to a specific tick in the replay by re-simulating from scratch */
+  const handleReplaySeek = useCallback((targetTick: number) => {
+    if (!replayData || !canvasRef.current || replaySeeking) return;
+    setReplaySeeking(true);
+
+    // Run the heavy resimulation in a setTimeout so the UI can show the seeking indicator
+    setTimeout(() => {
+      if (!canvasRef.current || !replayData) return;
+      const currentSpeed = engineRef.current?.gameSpeed ?? 2;
+      const wasPaused = engineRef.current?.paused ?? false;
+
+      // Create a new engine fast-forwarded to targetTick
+      const newEngine = GameEngine.seekReplay(canvasRef.current, replayData, targetTick);
+      newEngine.gameSpeed = currentSpeed;
+      newEngine.paused = wasPaused;
+
+      // Swap the engine ref — the rAF loop reads from .current each frame
+      engineRef.current = newEngine;
+
+      setReplaySeeking(false);
+    }, 20);
+  }, [replayData, replaySeeking]);
+
   // ── Game Loop ──────────────────────────────────────────────
 
   useEffect(() => {
@@ -160,6 +195,16 @@ function App() {
     engineRef.current.setGameMode(gameMode);
     setGameSeed(engineRef.current.seed);
     setIsEngineReady(true);
+
+    // ── Replay: auto-place core & init engine replay ──
+    if (replayData) {
+      engineRef.current.placeCore(replayData.coreX, replayData.coreY);
+      engineRef.current.initReplay(replayData);
+      setPlacingCore(false);
+      // Auto-start with faster speed so replay is watchable quickly
+      engineRef.current.gameSpeed = 2;
+      setGameSpeed(2);
+    }
 
     const loop = (t: number) => {
       if (!engineRef.current) return;
@@ -209,9 +254,9 @@ function App() {
     if (engineRef.current) engineRef.current.selectedPlacement = selectedBuilding;
   }, [selectedBuilding]);
 
-  // Auto-show leaderboard on game over
+  // Auto-show leaderboard on game over (not in replay mode)
   useEffect(() => {
-    if (isGameOver && !scoreSubmitted) {
+    if (isGameOver && !scoreSubmitted && !replayData) {
       setShowLeaderboard(true);
     }
   }, [isGameOver]);
@@ -245,6 +290,7 @@ function App() {
 
   const handleUseAbility = (id: string) => {
     if (!engineRef.current || engineRef.current.gameOver || engineRef.current.paused) return;
+    if (engineRef.current.isReplay) return; // replay mode — no abilities
     engineRef.current.useAbility(id);
   };
 
@@ -291,6 +337,7 @@ function App() {
     setResearchState({ levels: {} });
     setAbilityState(createAbilityState());
     setTutorial(createTutorialState());
+    setReplayData(null);
   };
 
   const handleUnlock = (node: TechNode) => {
@@ -332,14 +379,14 @@ function App() {
   };
 
   const handleSave = () => {
-    if (engineRef.current) {
+    if (engineRef.current && !engineRef.current.isReplay) {
       engineRef.current.saveGame();
       setHasSave(true);
     }
   };
 
   const handleLoad = () => {
-    if (!engineRef.current) return;
+    if (!engineRef.current || engineRef.current.isReplay) return;
     if (engineRef.current.loadGame()) {
       setResources({ ...engineRef.current.resources.state });
       setGameStats({ time: engineRef.current.gameTime, killed: engineRef.current.enemiesKilled });
@@ -472,6 +519,7 @@ function App() {
   /** Try to place the currently selected building at (worldX, worldY). Used for click + drag. */
   const tryPlaceBuilding = (worldX: number, worldY: number) => {
     if (!engineRef.current || !isEngineReady) return;
+    if (engineRef.current.isReplay) return; // replay mode — no user actions
     if (worldX < 0 || worldY < 0 || worldX >= GRID_SIZE || worldY >= GRID_SIZE) return;
     if (engineRef.current.placingCore || selectedModule !== ModuleType.NONE) return;
     const currentTile = engineRef.current.grid.tiles[worldY][worldX];
@@ -603,6 +651,7 @@ function App() {
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     if (!engineRef.current || !isEngineReady) return;
+    if (engineRef.current.isReplay) return; // replay mode — no user actions
     const { x: worldX, y: worldY } = screenToWorld(e.clientX, e.clientY);
     if (worldX < 0 || worldY < 0 || worldX >= GRID_SIZE || worldY >= GRID_SIZE) return;
 
@@ -677,6 +726,7 @@ function App() {
         seed={gameSeed}
         setSeed={setGameSeed}
         onStartTutorial={handleStartTutorial}
+        onLoadReplay={handleLoadReplay}
       />
     );
   }
@@ -745,7 +795,7 @@ function App() {
       {showLeaderboard && (
         <LeaderboardOverlay
           onClose={() => setShowLeaderboard(false)}
-          showSubmit={isGameOver && !scoreSubmitted}
+          showSubmit={isGameOver && !scoreSubmitted && !replayData}
           submitData={isGameOver ? {
             wave: waveInfo.wave,
             kills: gameStats.killed,
@@ -773,6 +823,8 @@ function App() {
         waveInfo={waveInfo}
         gameSpeed={gameSpeed}
         nextWavePreview={gameMode === 'wellen' && waveInfo.buildPhase ? getWaveComposition(waveInfo.wave + 1) : null}
+        isReplay={replayData !== null}
+        replayId={replayData?.id}
         onTogglePause={togglePause}
         onRestart={handleRestart}
         onToggleTechTree={() => setShowTechTree(prev => !prev)}
@@ -845,6 +897,36 @@ function App() {
           unlockedBuildings={unlockedBuildings}
         />}
       </div>
+
+      {/* Replay player controls */}
+      {replayData && (
+        <ReplayControls
+          currentTick={gameStats.time}
+          totalTicks={replayData.result.gameTime}
+          paused={paused}
+          speed={gameSpeed}
+          wave={waveInfo.wave}
+          kills={gameStats.killed}
+          seeking={replaySeeking}
+          onTogglePause={togglePause}
+          onSetSpeed={(s) => {
+            if (!engineRef.current) return;
+            engineRef.current.gameSpeed = s;
+            setGameSpeed(s);
+          }}
+          onSkipForward={() => {
+            if (!engineRef.current || !replayData || replaySeeking) return;
+            const target = Math.min(engineRef.current.gameTime + 10, replayData.result.gameTime);
+            handleReplaySeek(target);
+          }}
+          onSkipBackward={() => {
+            if (!engineRef.current || !replayData || replaySeeking) return;
+            const target = Math.max(0, engineRef.current.gameTime - 10);
+            handleReplaySeek(target);
+          }}
+          onSeek={handleReplaySeek}
+        />
+      )}
     </div>
   );
 }
