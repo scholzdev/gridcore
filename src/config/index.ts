@@ -137,9 +137,10 @@ export interface Building {
   range?: number;
   damage?: number;
   income: { energy?: number; scrap?: number; data?: number; steel?: number; electronics?: number; };
-  consumes?: { energy?: number; scrap?: number; electronics?: number; data?: number; };
+  consumes?: { energy?: number; scrap?: number; steel?: number; electronics?: number; data?: number; };
   cost: { energy?: number; scrap?: number; steel?: number; electronics?: number; data?: number; };
   costIncrease: { energy?: number; scrap?: number; steel?: number; electronics?: number; data?: number; };
+  maxCount?: number;
 }
 
 export const BUILDING_STATS: Record<number, Partial<Building>> = {};
@@ -153,6 +154,7 @@ ALL_BUILDINGS.forEach(b => {
     ...(b.consumes && { consumes: b.consumes }),
     ...(b.cost && { cost: b.cost }),
     ...(b.costIncrease && { costIncrease: b.costIncrease }),
+    ...(b.maxCount !== undefined && { maxCount: b.maxCount }),
   };
 });
 

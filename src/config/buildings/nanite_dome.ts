@@ -18,25 +18,7 @@ export const NANITE_DOME_CONFIG: BuildingConfig = {
     healPerTick: 30,
   },
 
-  hooks: {
-    onAuraTick(event) {
-      const { game } = event;
-      const healPerTick = 30;
-      const healAmt = healPerTick * event.levelMult * game.researchBuffs.repairMult;
-      const size = game.grid.size;
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const nType = game.grid.tiles[y][x];
-          if (nType === TileType.EMPTY || nType === TileType.ORE_PATCH) continue;
-          const nLevel = game.grid.levels[y][x] || 1;
-          const maxHP = game.getMaxHP(nType, nLevel);
-          if (game.grid.healths[y][x] < maxHP) {
-            game.grid.healths[y][x] = Math.min(maxHP, game.grid.healths[y][x] + healAmt);
-          }
-        }
-      }
-    },
-  },
+  // Healing logic is handled by Engine.ts aura processing (uses post-module range)
 
   techTree: {
     id: 'nanite_dome',

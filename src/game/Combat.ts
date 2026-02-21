@@ -7,7 +7,7 @@ import { fireOnKill, fireOnHit, fireOnCombatTick, fireOnDestroyed, fireOnEnterKi
 import { playKillThrottled, playShootThrottled, playCoreHit, playGameOver } from './Sound';
 import { isAbilityActive } from './Abilities';
 import {
-  THORNS_REFLECT_FRACTION, WALL_SLOW_DURATION_MS, WALL_SLOW_FACTOR,
+  THORNS_REFLECT_FRACTION, WALL_SLOW_FACTOR,
   ABSORBER_RANGE, ABSORBER_DAMAGE_MULT, PROJECTILE_HIT_THRESHOLD,
   PATHFINDING_WAYPOINT_THRESHOLD,
 } from '../constants';
@@ -94,7 +94,7 @@ export function detonateMines(engine: GameEngine) {
     const mult = getLevelMult(level);
     const cfg = BUILDING_REGISTRY[TileType.MINEFIELD];
     const blastRadius = cfg?.combat?.blastRadius ?? 2.5;
-    const mineDmg = (BUILDING_STATS[TileType.MINEFIELD]?.damage || 250) * mult * engine.prestigeDamageMult;
+    const mineDmg = (BUILDING_STATS[TileType.MINEFIELD]?.damage || 250) * mult * engine.dataVaultBuff * engine.prestigeDamageMult;
     engine.enemies.forEach(e => {
       const dist = Math.sqrt(Math.pow(e.x - mine.x - 0.5, 2) + Math.pow(e.y - mine.y - 0.5, 2));
       if (dist <= blastRadius) {
@@ -148,7 +148,8 @@ export function turretLogic(engine: GameEngine) {
       const tCfg = BUILDING_REGISTRY[engine.grid.tiles[y][x]];
       if (!tCfg?.support || !engine.activeTiles[y]?.[x]) continue;
       const level = engine.grid.levels[y][x] || 1;
-      const buffRange = tCfg.range || 5;
+      const auraEvt = fireOnAuraTick(engine, x, y, engine.gameTime, tCfg.range || 5);
+      const buffRange = auraEvt.range;
 
       if (tCfg.support.radarRangeBuffBase) {
         const rangeBuff = tCfg.support.radarRangeBuffBase + (level - 1) * (tCfg.support.radarRangeBuffPerLevel ?? 1);
@@ -353,7 +354,7 @@ export function turretLogic(engine: GameEngine) {
 /** Multi-target projectile — fires at N closest enemies (e.g. Tesla Coil) */
 function fireMultiTarget(engine: GameEngine, x: number, y: number, range: number, dmg: number, fireChance: number, level: number, mod: number, bldg: BuildingConfig) {
   const combat = bldg.combat!;
-  const maxTargets = (combat.maxTargetsBase ?? 3) + level * (combat.maxTargetsPerLevel ?? 1);
+  const maxTargets = (combat.maxTargetsBase ?? 3) + (level - 1) * (combat.maxTargetsPerLevel ?? 1);
   const targets = engine.enemies.filter(e => Math.sqrt(Math.pow(e.x - x, 2) + Math.pow(e.y - y, 2)) <= range);
   const selected = targets.slice(0, maxTargets);
   if (selected.length > 0 && Math.random() > fireChance) {
@@ -514,7 +515,7 @@ export function updateDrones(engine: GameEngine) {
       if (engine.grid.tiles[y][x] !== TileType.DRONE_HANGAR) continue;
       if (!engine.activeTiles[y]?.[x]) continue;
       const level = engine.grid.levels[y][x] || 1;
-      const maxDrones = (droneCombat.maxDronesBase ?? 1) + level * (droneCombat.maxDronesPerLevel ?? 1);
+      const maxDrones = (droneCombat.maxDronesBase ?? 1) + (level - 1) * (droneCombat.maxDronesPerLevel ?? 1);
       const currentDrones = engine.drones.filter(d => d.hangarX === x && d.hangarY === y).length;
       if (currentDrones < maxDrones) {
         engine.drones.push({ id: Math.random().toString(36), x: x + 0.5, y: y + 0.5, hangarX: x, hangarY: y });
@@ -697,11 +698,11 @@ export function moveEnemies(engine: GameEngine, timestamp: number) {
 
     // Slow field check (config-driven: any building with support.slowPct)
     let slowFactor = 1;
-    const scanRange = 6;
+    const scanRange = 10;
     for (let sy = Math.max(0, ty - scanRange); sy <= Math.min(engine.grid.size - 1, ty + scanRange); sy++) {
       for (let sx = Math.max(0, tx - scanRange); sx <= Math.min(engine.grid.size - 1, tx + scanRange); sx++) {
         const sCfg = BUILDING_REGISTRY[engine.grid.tiles[sy][sx]];
-        if (sCfg?.support?.slowPct) {
+        if (sCfg?.support?.slowPct && engine.activeTiles[sy]?.[sx]) {
           const level = engine.grid.levels[sy][sx] || 1;
           const auraEvt = fireOnAuraTick(engine, sx, sy, engine.gameTime, sCfg.range || 5);
           const range = auraEvt.range;

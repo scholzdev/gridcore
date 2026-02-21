@@ -31,7 +31,7 @@ import { createAbilityState, tickAbilities, activateAbility } from './Abilities'
 import type { AbilityState } from './Abilities';
 import { DIFFICULTY_PRESETS, WAVE_CONFIG, ENEMY_TYPES, getWaveComposition, pickEnemyType, getEndlessEnemyType } from './types';
 import type { TechNode } from './TechTree';
-import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed, fireOnPlace, fireOnUpgrade, fireOnRemove } from './HookSystem';
+import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed, fireOnPlace, fireOnUpgrade, fireOnRemove, fireOnKill } from './HookSystem';
 
 export class GameEngine {
   grid: GameGrid;
@@ -334,6 +334,8 @@ export class GameEngine {
   firePlaceHook(x: number, y: number) { fireOnPlace(this, x, y); }
   fireUpgradeHook(x: number, y: number, prevLevel: number, newLevel: number) { fireOnUpgrade(this, x, y, prevLevel, newLevel); }
   fireRemoveHook(x: number, y: number, type: number, level: number, refund: Record<string, number>) { fireOnRemove(this, x, y, type, level, refund); }
+  /** Exposed for chain-kills in module hooks */
+  fireOnKillDirect(x: number, y: number, enemy: any) { fireOnKill(this, x, y, enemy); }
 
   // ── Save / Load ────────────────────────────────────────────
 
@@ -674,22 +676,42 @@ export class GameEngine {
           const tickEvent = fireOnTick(this, x, y, this.gameTime);
 
           // Consumes (flat — NOT scaled with level, so upgrades don't punish)
+          let powered = true;
           if (stats.consumes) {
             const consumes = { ...stats.consumes };
             // Apply hook-driven consume multiplier (e.g. Efficiency module sets consumeMult = 0.5)
             if (consumes.energy) consumes.energy *= tickEvent.consumeMult;
             if (consumes.scrap) consumes.scrap *= tickEvent.consumeMult;
+            if (consumes.steel) consumes.steel *= tickEvent.consumeMult;
             if (consumes.electronics) consumes.electronics *= tickEvent.consumeMult;
             if (consumes.data) consumes.data *= tickEvent.consumeMult;
             // Research: energy consume reduction
             if (consumes.energy) consumes.energy *= this.researchBuffs.energyConsumeMult;
-            if (!this.resources.canAfford(consumes)) continue;
+            if (!this.resources.canAfford(consumes)) { powered = false; } else {
             this.resources.spend(consumes);
             if (consumes.energy) { tickExpense.energy += consumes.energy; breakdown.energy.push({ type, x, y, amount: -consumes.energy }); }
             if (consumes.scrap) { tickExpense.scrap += consumes.scrap; breakdown.scrap.push({ type, x, y, amount: -consumes.scrap }); }
+            if (consumes.steel) { tickExpense.steel += consumes.steel; breakdown.steel.push({ type, x, y, amount: -consumes.steel }); }
             if (consumes.electronics) { tickExpense.electronics += consumes.electronics; breakdown.electronics.push({ type, x, y, amount: -consumes.electronics }); }
             if (consumes.data) { tickExpense.data += (consumes.data || 0); breakdown.data.push({ type, x, y, amount: -(consumes.data || 0) }); }
+            }
           }
+
+          // Check for self-destruction (e.g. Overdrive Turret losing HP from its own hook)
+          // Must happen before the `powered` gate so unpowered buildings still die
+          if (this.grid.healths[y][x] <= 0) {
+            fireOnDestroyed(this, x, y, type);
+            this.grid.tiles[y][x] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
+            this.grid.levels[y][x] = 0;
+            this.grid.shields[y][x] = 0;
+            this.grid.modules[y][x] = 0;
+            if (this.purchasedCounts[type] > 0) this.purchasedCounts[type]--;
+            this.cleanupTile(x, y);
+            this.grid.invalidatePaths();
+            continue;
+          }
+
+          if (!powered) continue;
           this.activeTiles[y][x] = true;
 
           // Maintenance cost: every building costs scrap per tick based on level
@@ -705,19 +727,6 @@ export class GameEngine {
           if (tickEvent.healAmount > 0) {
             const maxHP = this.getMaxHP(type, level);
             this.grid.healths[y][x] = Math.min(maxHP, this.grid.healths[y][x] + tickEvent.healAmount);
-          }
-
-          // Check for self-destruction (e.g. Overdrive Turret losing HP from its own hook)
-          if (this.grid.healths[y][x] <= 0) {
-            fireOnDestroyed(this, x, y, type);
-            this.grid.tiles[y][x] = ORE_BUILDINGS.includes(type) ? TileType.ORE_PATCH : TileType.EMPTY;
-            this.grid.levels[y][x] = 0;
-            this.grid.shields[y][x] = 0;
-            this.grid.modules[y][x] = 0;
-            if (this.purchasedCounts[type] > 0) this.purchasedCounts[type]--;
-            this.cleanupTile(x, y);
-            this.grid.invalidatePaths();
-            continue;
           }
 
           // Income
@@ -777,6 +786,25 @@ export class GameEngine {
                   const nType = this.grid.tiles[ny][nx];
                   if (nType !== TileType.EMPTY && nType !== TileType.ORE_PATCH) {
                     this.grid.shields[ny][nx] = Math.max(this.grid.shields[ny][nx], cap);
+                  }
+                }
+              }
+            }
+
+            // Repair aura (uses auraRange which includes Range Boost module)
+            if (cfg.support.healPerTick && auraRange > 0) {
+              const healAmt = cfg.support.healPerTick * mult * this.researchBuffs.repairMult;
+              for (let dy = -auraRange; dy <= auraRange; dy++) {
+                for (let dx = -auraRange; dx <= auraRange; dx++) {
+                  const nx = x + dx; const ny = y + dy;
+                  if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+                  if (Math.sqrt(dx * dx + dy * dy) > auraRange) continue;
+                  const nType = this.grid.tiles[ny][nx];
+                  if (nType === TileType.EMPTY || nType === TileType.ORE_PATCH) continue;
+                  const nLevel = this.grid.levels[ny][nx] || 1;
+                  const maxHP = this.getMaxHP(nType, nLevel);
+                  if (this.grid.healths[ny][nx] < maxHP) {
+                    this.grid.healths[ny][nx] = Math.min(maxHP, this.grid.healths[ny][nx] + healAmt);
                   }
                 }
               }

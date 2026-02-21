@@ -97,9 +97,6 @@ export class GameGrid {
       if (count >= cfg.maxCount) return false;
     }
 
-    // Prevent placement that would block all paths to core
-    if (this.wouldBlockPath(x, y)) return false;
-
     this.tiles[y][x] = type;
     this.levels[y][x] = 1;
     this.healths[y][x] = BUILDING_STATS[type]?.health || 100;

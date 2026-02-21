@@ -161,7 +161,12 @@ const ENEMY_SWARM: MapEvent = {
   color: '#fdcb6e',
   duration: 0,
   apply: (engine) => {
-    for (let i = 0; i < 15; i++) {
+    const swarmCount = 15;
+    // Add to wave total so UI counts are correct
+    if (engine.gameMode === 'wellen') {
+      engine.waveEnemiesTotal += swarmCount;
+    }
+    for (let i = 0; i < swarmCount; i++) {
       const s = engine.grid.size;
       const side = Math.floor(rng(engine) * 4);
       let x = 0, y = 0;

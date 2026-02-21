@@ -193,7 +193,9 @@ function App() {
           wave: engineRef.current.currentWave,
           buildPhase: engineRef.current.waveBuildPhase,
           buildTimer: engineRef.current.waveBuildTimer,
-          enemiesLeft: Math.max(0, engineRef.current.waveEnemiesTotal - engineRef.current.waveEnemiesKilledThisWave),
+          enemiesLeft: engineRef.current.waveActive
+            ? Math.max(0, (engineRef.current.waveEnemiesTotal - engineRef.current.waveEnemiesKilledThisWave))
+            : 0,
           enemiesTotal: engineRef.current.waveEnemiesTotal,
         });
       }
@@ -602,7 +604,7 @@ function App() {
     e.preventDefault();
     if (!engineRef.current || !isEngineReady) return;
     const { x: worldX, y: worldY } = screenToWorld(e.clientX, e.clientY);
-    if (worldX < 0 || worldY < 0 || worldX >= 30 || worldY >= 30) return;
+    if (worldX < 0 || worldY < 0 || worldX >= GRID_SIZE || worldY >= GRID_SIZE) return;
 
     const type = engineRef.current.grid.tiles[worldY][worldX];
     const level = engineRef.current.grid.levels[worldY][worldX] || 1;

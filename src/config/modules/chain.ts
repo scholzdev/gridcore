@@ -1,5 +1,6 @@
 import { TileType, ModuleType } from '../types';
 import type { ModuleConfig } from '../types';
+import { KILL_REWARD, ENEMY_TYPES } from '../../game/types';
 
 export const CHAIN_CONFIG: ModuleConfig = {
   id: ModuleType.CHAIN,
@@ -24,8 +25,16 @@ export const CHAIN_CONFIG: ModuleConfig = {
         if (e.id === event.enemy.id || count >= maxTargets) continue;
         const dist = Math.sqrt(Math.pow(e.x - event.enemy.x, 2) + Math.pow(e.y - event.enemy.y, 2));
         if (dist <= chainRange) {
-          e.health -= chainDmg;
-          event.game.addDamageNumber(e.x, e.y, chainDmg, '#a29bfe');
+          // Apply enemy shield absorption first
+          let dmg = chainDmg;
+          if (e.enemyShield && e.enemyShield > 0) {
+            const absorbed = Math.min(dmg, e.enemyShield);
+            e.enemyShield -= absorbed;
+            dmg -= absorbed;
+            if (absorbed > 0) event.game.addDamageNumber(e.x, e.y - 0.3, absorbed, '#3498db');
+          }
+          e.health -= dmg;
+          event.game.addDamageNumber(e.x, e.y, dmg, '#a29bfe');
           if (e.health <= 0) {
             killed.push(e);
           }
@@ -51,10 +60,13 @@ export const CHAIN_CONFIG: ModuleConfig = {
           if (event.game.gameMode === 'wellen') (event.game as any).onWaveEnemyKilled();
           if (event.building) {
             event.game.addTileKill(event.building.x, event.building.y);
+            // Fire onKill hooks for proper attribution
+            (event.game as any).fireOnKillDirect?.(event.building.x, event.building.y, e);
           }
-          // Kill reward
-          const rewardBase = 15 + event.game.gameTime * 0.1;
-          event.game.resources.add({ scrap: Math.floor(rewardBase) });
+          // Kill reward with proper enemy type multiplier
+          const typeDef = ENEMY_TYPES[e.enemyType || 'normal'];
+          const killReward = Math.floor((KILL_REWARD.base + event.game.gameTime * KILL_REWARD.perSecond) * typeDef.rewardMult);
+          event.game.resources.add({ scrap: killReward });
         }
       }
     },

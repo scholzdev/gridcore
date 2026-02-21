@@ -610,7 +610,19 @@ export class Renderer {
 
     // Check if placement would be valid
     const needsOre = ORE_BUILDINGS.includes(selected);
-    const canPlace = needsOre ? isOre : isEmpty;
+    let canPlace = needsOre ? isOre : isEmpty;
+
+    // Check maxCount
+    if (canPlace) {
+      const cfg = BUILDING_REGISTRY[selected];
+      if (cfg?.maxCount) {
+        let count = 0;
+        for (let r = 0; r < engine.grid.size; r++)
+          for (let c = 0; c < engine.grid.size; c++)
+            if (engine.grid.tiles[r][c] === selected) count++;
+        if (count >= cfg.maxCount) canPlace = false;
+      }
+    }
 
     const px = hx * zoom;
     const py = hy * zoom;

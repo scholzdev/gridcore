@@ -99,6 +99,7 @@ export const BuildBtn = ({ type, selected, set, label, cost, color, affordable =
               {stats?.damage && <div style={{ fontSize: '11px', color: '#e67e22', marginTop: '2px' }}>Schaden: {stats.damage}{stats.range ? ` • Reichweite: ${stats.range}` : ''}</div>}
               {stats?.range && !stats?.damage && <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>Reichweite: {stats.range}</div>}
               <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>HP: {stats?.maxHealth}</div>
+              {stats?.maxCount && <div style={{ fontSize: '11px', color: '#e67e22', marginTop: '2px', fontWeight: 'bold' }}>Max: {stats.maxCount}</div>}
               <div style={{ fontSize: '10px', color: '#b2bec3', marginTop: '6px', fontStyle: 'italic' }}>Shift halten für Skalierung</div>
             </>
           ) : (
