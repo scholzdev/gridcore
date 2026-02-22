@@ -1,5 +1,5 @@
 import { TileType, ModuleType } from '../config';
-import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, BUILDING_STATS, getMaxHP, ORE_BUILDINGS } from '../config';
+import { TILE_COLORS, MODULE_DEFS, BUILDING_REGISTRY, BUILDING_STATS, ORE_BUILDINGS } from '../config';
 import type { Enemy, Drone, LaserBeam, DamageNumber } from './types';
 import { ENEMY_TYPES, WAVE_CONFIG } from './types';
 import type { GameEngine } from './Engine';

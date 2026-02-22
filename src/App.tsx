@@ -343,6 +343,7 @@ function App() {
   const handleUnlock = (node: TechNode) => {
     if (!engineRef.current) return;
     if (engineRef.current.unlockBuilding(node)) {
+      engineRef.current.recordAction({ action: 'unlock', techId: node.id });
       setKillPoints(engineRef.current.killPoints);
       setUnlockedBuildings(new Set(engineRef.current.unlockedBuildings));
     }
@@ -413,9 +414,23 @@ function App() {
   const handleResearch = (nodeId: string) => {
     if (!engineRef.current) return;
     if (engineRef.current.buyResearch(nodeId)) {
+      engineRef.current.recordAction({ action: 'research', researchId: nodeId });
       setResources({ ...engineRef.current.resources.state });
       setResearchState({ ...engineRef.current.research, levels: { ...engineRef.current.research.levels } });
     }
+  };
+
+  const handleDownloadReplay = () => {
+    if (!engineRef.current || engineRef.current.isReplay) return;
+    const replay = engineRef.current.exportReplay();
+    const json = JSON.stringify(replay, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `replay-${replay.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -534,6 +549,7 @@ function App() {
           engineRef.current.fireUpgradeHook(worldX, worldY, currentLevel, newLevel);
           // Set HP to full max including research + prestige multipliers
           engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.getMaxHP(currentTile, newLevel));
+          engineRef.current.recordAction({ action: 'upgrade', x: worldX, y: worldY, type: currentTile });
           playUpgrade();
           setResources({ ...engineRef.current.resources.state });
           refreshTooltip(worldX, worldY);
@@ -550,6 +566,7 @@ function App() {
           engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.getMaxHP(selectedBuilding, 1));
           engineRef.current.purchasedCounts[selectedBuilding] = (engineRef.current.purchasedCounts[selectedBuilding] || 0) + 1;
           engineRef.current.buildingsPlaced++;
+          engineRef.current.recordAction({ action: 'place', x: worldX, y: worldY, type: selectedBuilding });
           playBuild();
           setResources({ ...engineRef.current.resources.state });
         }
@@ -625,6 +642,8 @@ function App() {
     // Core placement phase
     if (engineRef.current.placingCore) {
       if (engineRef.current.placeCore(worldX, worldY)) {
+        // Start recording actions for replay export
+        engineRef.current.recording = true;
         setPlacingCore(false);
       }
       return;
@@ -638,6 +657,7 @@ function App() {
       if (modDef && engineRef.current.resources.canAfford(modDef.cost)) {
         if (engineRef.current.grid.installModule(worldX, worldY, selectedModule)) {
           engineRef.current.resources.spend(modDef.cost);
+          engineRef.current.recordAction({ action: 'module', x: worldX, y: worldY, moduleType: selectedModule });
           playModuleInstall();
           setResources({ ...engineRef.current.resources.state });
         }
@@ -667,6 +687,7 @@ function App() {
         // Set HP to full max for the new (lower) level including research + prestige
         const newLvl = engineRef.current.grid.levels[worldY][worldX];
         engineRef.current.grid.healths[worldY][worldX] = Math.round(engineRef.current.getMaxHP(type, newLvl));
+        engineRef.current.recordAction({ action: 'remove', x: worldX, y: worldY });
         playSell();
         setResources({ ...engineRef.current.resources.state });
         refreshTooltip(worldX, worldY);
@@ -680,6 +701,7 @@ function App() {
         engineRef.current.fireRemoveHook(worldX, worldY, type, removedLevel, refund);
         if (engineRef.current.purchasedCounts[type] > 0) engineRef.current.purchasedCounts[type]--;
         engineRef.current.cleanupTile(worldX, worldY);
+        engineRef.current.recordAction({ action: 'remove', x: worldX, y: worldY });
         playSell();
         setResources({ ...engineRef.current.resources.state });
         refreshTooltip(worldX, worldY);
@@ -849,6 +871,7 @@ function App() {
         onHighlightResource={(res: string | null) => {
           if (engineRef.current) engineRef.current.highlightResource = res;
         }}
+        onDownloadReplay={handleDownloadReplay}
       />
 
       {!placingCore && (

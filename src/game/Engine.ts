@@ -33,7 +33,7 @@ import { DIFFICULTY_PRESETS, WAVE_CONFIG, ENEMY_TYPES, getWaveComposition, pickE
 import type { TechNode } from './TechTree';
 import { TECH_TREE, ModuleType, MODULE_DEFS } from '../config';
 import { fireOnTick, fireOnAuraTick, fireOnResourceGained, fireOnWaveStart, fireOnWaveEnd, fireOnGameStart, fireOnPrestige, fireOnUnlockTech, fireOnDestroyed, fireOnPlace, fireOnUpgrade, fireOnRemove, fireOnKill } from './HookSystem';
-import type { ReplayData } from './Replay';
+import type { ReplayData, ReplayAction } from './Replay';
 
 export class GameEngine {
   grid: GameGrid;
@@ -149,6 +149,38 @@ export class GameEngine {
   private replayActionIndex: number = 0;
   /** True when engine is in replay playback mode (disables user interaction) */
   get isReplay(): boolean { return this.replayData !== null; }
+
+  // ── Replay Recording ─────────────────────────────────────────
+  /** Recorded actions during live gameplay (for download) */
+  recordedActions: ReplayAction[] = [];
+  /** Whether action recording is active */
+  recording: boolean = false;
+
+  /** Record a player action for replay export */
+  recordAction(action: Omit<ReplayAction, 'tick'>) {
+    if (!this.recording || this.isReplay) return;
+    this.recordedActions.push({ tick: this.gameTime, ...action });
+  }
+
+  /** Export the current game as a ReplayData object */
+  exportReplay(): ReplayData {
+    const id = this.seed.slice(0, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 10);
+    return {
+      id,
+      seed: this.seed,
+      mode: this.gameMode,
+      difficulty: this.difficulty,
+      coreX: this.grid.coreX,
+      coreY: this.grid.coreY,
+      actions: this.recordedActions,
+      result: {
+        wavesReached: this.currentWave,
+        enemiesKilled: this.enemiesKilled,
+        gameTime: this.gameTime,
+        gameOver: this.gameOver,
+      },
+    };
+  }
 
   constructor(canvas: HTMLCanvasElement, seed?: string) {
     this.canvas = canvas;

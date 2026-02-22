@@ -577,7 +577,7 @@ export function updateDrones(engine: GameEngine) {
   });
 }
 
-export function moveEnemies(engine: GameEngine, timestamp: number) {
+export function moveEnemies(engine: GameEngine, _timestamp: number) {
   engine.enemies = engine.enemies.filter(e => {
     const tx = Math.floor(e.x);
     const ty = Math.floor(e.y);

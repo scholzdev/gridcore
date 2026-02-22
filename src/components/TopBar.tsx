@@ -52,6 +52,7 @@ interface TopBarProps {
   hasSave: boolean;
   seed: string;
   onHighlightResource: (res: string | null) => void;
+  onDownloadReplay?: () => void;
 }
 
 const RESOURCE_COLORS: Record<string, string> = {
@@ -161,7 +162,7 @@ export const TopBar = ({
   isReplay, replayId,
   onTogglePause, onRestart, onToggleTechTree, onTogglePrestige, onToggleStats, onToggleMarket,
   onToggleResearch, onToggleGuide, onToggleLeaderboard, onToggleMute, onToggleSpeed,
-  isMuted, onSave, onLoad, hasSave, seed, onHighlightResource,
+  isMuted, onSave, onLoad, hasSave, seed, onHighlightResource, onDownloadReplay,
 }: TopBarProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -216,6 +217,11 @@ export const TopBar = ({
           padding: '4px 10px', cursor: 'pointer', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace',
           backgroundColor: '#3498db', color: '#fff', border: 'none'
         }}>↺</button>}
+
+        {isGameOver && !isReplay && onDownloadReplay && <button onClick={onDownloadReplay} title="Replay herunterladen" style={{
+          padding: '4px 10px', cursor: 'pointer', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace',
+          backgroundColor: '#8e44ad', color: '#fff', border: 'none'
+        }}>⬇ Replay</button>}
       </div>
 
       {/* Info group */}
